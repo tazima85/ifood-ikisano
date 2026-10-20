@@ -17,7 +17,7 @@
   }
   h1 { font-size: 1.25rem; margin: 0 0 4px; }
   p.subtitulo { color: #666; font-size: 0.85rem; margin: 0 0 20px; }
-  p.descricao-acao { color: #888; font-size: 0.78rem; margin: 4px 0 10px; }
+  p.descricao-acao { color: #888; font-size: 0.78rem; margin: 4px 0 0; }
   .cartao {
     background: #fff;
     border-radius: 12px;
@@ -49,8 +49,38 @@
   button:active { opacity: 0.8; }
   button:disabled { opacity: 0.5; cursor: default; }
   .secao-titulo { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #888; margin: 16px 0 6px; }
+  .secao-titulo:first-child { margin-top: 0; }
   #erro-login { color: #c0392b; font-size: 0.85rem; margin-top: 8px; display: none; }
   header { display: flex; justify-content: space-between; align-items: baseline; }
+
+  .abas { display: flex; gap: 4px; margin-bottom: 16px; }
+  .aba-botao {
+    flex: 1;
+    margin: 0;
+    background: #e4e4e8;
+    color: #555;
+  }
+  .aba-botao.ativa { background: #ff6a00; color: #fff; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { text-align: left; padding: 10px 6px; font-size: 0.85rem; border-bottom: 1px solid #eee; }
+  th { color: #888; font-size: 0.72rem; text-transform: uppercase; }
+  tr.linha-loja { cursor: pointer; }
+  tr.linha-loja:hover { background: #fafafa; }
+  tr.linha-loja.selecionada { background: #fff3ea; }
+
+  .status-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eee;
+    color: #777;
+  }
+  .status-badge.status-ok { background: #e8f5ea; color: #2e9e4f; }
+  .status-badge.status-alerta { background: #fbe7e4; color: #c0392b; }
+  .status-badge.status-neutro { background: #eee; color: #777; }
 
   #resultados { display: flex; flex-direction: column; gap: 10px; }
   .resultado-vazio { color: #888; font-size: 0.85rem; margin: 0; }
@@ -67,22 +97,13 @@
   .resultado-cabecalho {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
     margin-bottom: 8px;
     flex-wrap: wrap;
   }
   .resultado-cabecalho strong { font-size: 0.9rem; }
-  .status-badge {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: #e8f5ea;
-    color: #2e9e4f;
-  }
-  .resultado-cartao.erro .status-badge { background: #fbe7e4; color: #c0392b; }
+  .resultado-cabecalho .status-badge { margin: 0; }
   .resultado-hora { color: #999; font-size: 0.72rem; margin-left: auto; }
   dl.campos { margin: 0; }
   dl.campos dt { font-weight: 600; color: #555; margin-top: 6px; font-size: 0.78rem; }
@@ -96,8 +117,11 @@
     margin-top: 10px;
     padding-top: 10px;
   }
-  .pausa-descricao { font-weight: 600; }
+  .pausa-descricao { font-weight: 600; font-size: 0.85rem; }
   .pausa-periodo { color: #666; font-size: 0.78rem; margin: 2px 0 8px; }
+
+  .lista-horarios { margin: 0; padding-left: 18px; font-size: 0.85rem; }
+  .lista-horarios li { margin-bottom: 2px; }
 </style>
 </head>
 <body>
@@ -118,37 +142,58 @@
       <h1>Painel iFood (Boali)</h1>
       <button class="secundario" id="botao-sair" type="button">Sair</button>
     </header>
-    <p class="subtitulo">Chama as ações da Edge Function ifood-pausas direto, sem precisar de curl.</p>
 
-    <div class="cartao">
-      <label for="campo-merchant-id">Merchant ID</label>
-      <input id="campo-merchant-id" type="text" placeholder="id da loja (fica salvo só neste navegador)" />
-
-      <div class="secao-titulo">Loja</div>
-      <button data-acao="listar-lojas" type="button">Listar lojas</button>
-      <button data-acao="detalhes-loja" data-usa-merchant="1" type="button">Detalhes da loja</button>
-      <button data-acao="consultar-status" data-usa-merchant="1" type="button">Consultar status</button>
-
-      <div class="secao-titulo">Horário de funcionamento</div>
-      <button data-acao="consultar-horario" data-usa-merchant="1" type="button">Consultar horário</button>
-      <button data-acao="configurar-horario-teste" data-usa-merchant="1" type="button">Configurar horário de funcionamento</button>
-      <p class="descricao-acao">Aplica: sábado 10h–19h; domingo 09h–12h, 13h–16h e 17h–23h.</p>
-
-      <div class="secao-titulo">Pausas</div>
-      <button data-acao="criar-pausa-teste" data-usa-merchant="1" type="button">Criar pausa</button>
-      <button data-acao="listar-pausas" data-usa-merchant="1" type="button">Listar pausas</button>
-
-      <div class="secao-titulo">WhatsApp</div>
-      <button data-acao="teste-whatsapp" type="button">Enviar mensagem de verificação</button>
-
-      <div class="secao-titulo">Monitoramento</div>
-      <button data-acao="monitorar" data-ignorar-janela="1" type="button">Rodar monitoramento agora</button>
+    <div class="abas">
+      <button class="aba-botao ativa" data-aba="dashboard" type="button">Painel</button>
+      <button class="aba-botao" data-aba="lojas" type="button">Lojas</button>
     </div>
 
-    <div class="cartao">
-      <div class="secao-titulo">Resultado das chamadas</div>
-      <div id="resultados">
-        <p class="resultado-vazio">Nenhuma chamada feita ainda.</p>
+    <div id="aba-dashboard" class="aba-conteudo">
+      <div class="cartao">
+        <div class="secao-titulo">Lojas monitoradas</div>
+        <table>
+          <thead><tr><th>Loja</th><th>Status</th></tr></thead>
+          <tbody id="corpo-tabela-lojas"></tbody>
+        </table>
+        <p id="tabela-lojas-vazia" class="resultado-vazio" style="display:none;">
+          Nenhuma loja cadastrada para monitoração. Adicione na aba "Lojas".
+        </p>
+      </div>
+
+      <div id="detalhe-loja" class="cartao" style="display:none;"></div>
+
+      <div class="cartao">
+        <div class="secao-titulo">WhatsApp</div>
+        <button data-acao="teste-whatsapp" type="button">Enviar mensagem de verificação</button>
+
+        <div class="secao-titulo">Monitoramento</div>
+        <button data-acao="monitorar" data-ignorar-janela="1" type="button">Rodar monitoramento agora</button>
+      </div>
+
+      <div class="cartao">
+        <div class="secao-titulo">Resultado das chamadas</div>
+        <div id="resultados">
+          <p class="resultado-vazio">Nenhuma chamada feita ainda.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="aba-lojas" class="aba-conteudo" style="display:none;">
+      <div class="cartao">
+        <div class="secao-titulo">Incluir loja na monitoração</div>
+        <label for="campo-nova-loja-id">Merchant ID</label>
+        <input id="campo-nova-loja-id" type="text" placeholder="id da loja no iFood" />
+        <label for="campo-nova-loja-nome">Nome (opcional — se vazio, busca automaticamente)</label>
+        <input id="campo-nova-loja-nome" type="text" placeholder="nome da loja" />
+        <button id="botao-incluir-loja" type="button">Incluir / reativar monitoração</button>
+      </div>
+
+      <div class="cartao">
+        <div class="secao-titulo">Todas as lojas cadastradas</div>
+        <table>
+          <thead><tr><th>Loja</th><th>Status</th><th></th></tr></thead>
+          <tbody id="corpo-tabela-gestao-lojas"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -165,10 +210,11 @@
 
   var CHAVE_ACCESS = 'ifoodPainelAccessToken';
   var CHAVE_REFRESH = 'ifoodPainelRefreshToken';
-  var CHAVE_MERCHANT_ID = 'ifoodPainelMerchantId';
 
   var ROTULOS_ACAO = {
-    'listar-lojas': 'Listar lojas',
+    'listar-lojas-cadastradas': 'Listar lojas monitoradas',
+    'cadastrar-loja': 'Incluir loja',
+    'remover-loja': 'Remover loja',
     'detalhes-loja': 'Detalhes da loja',
     'consultar-status': 'Consultar status',
     'consultar-horario': 'Consultar horário',
@@ -180,11 +226,18 @@
     'monitorar': 'Rodar monitoramento',
   };
 
+  var DIAS_PT = {
+    MONDAY: 'Segunda', TUESDAY: 'Terça', WEDNESDAY: 'Quarta', THURSDAY: 'Quinta',
+    FRIDAY: 'Sexta', SATURDAY: 'Sábado', SUNDAY: 'Domingo',
+  };
+  var ORDEM_DIAS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+
   function elemento(id) { return document.getElementById(id); }
 
   function mostrarPainel() {
     elemento('tela-login').style.display = 'none';
     elemento('painel').style.display = 'block';
+    carregarTabelaLojas();
   }
 
   function mostrarLogin(mensagemErro) {
@@ -206,7 +259,15 @@
     return data.toLocaleString('pt-BR');
   }
 
-  // --- Renderização dos resultados (cartões legíveis, sem "tela preta") ---
+  function somarMinutos(horaStr, minutos) {
+    var partes = horaStr.split(':').map(Number);
+    var totalMin = ((partes[0] * 60 + partes[1] + minutos) % 1440 + 1440) % 1440;
+    var h = Math.floor(totalMin / 60);
+    var m = totalMin % 60;
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  // --- Renderização genérica dos resultados (cartões legíveis) ---
 
   function adicionarResultado(cartao) {
     var container = elemento('resultados');
@@ -271,7 +332,7 @@
 
     if (sucesso !== null) {
       var selo = document.createElement('span');
-      selo.className = 'status-badge';
+      selo.className = 'status-badge ' + (sucesso ? 'status-ok' : 'status-alerta');
       selo.textContent = sucesso ? 'Sucesso' : 'Erro';
       cabecalho.appendChild(selo);
     }
@@ -304,23 +365,11 @@
     return cartao;
   }
 
-  // Lista de pausas com um botão "Remover" em cada item — já carrega o
-  // merchantId e o interruptionId certos, sem precisar digitar nada.
-  function criarCartaoListaPausas(merchantId, pausas) {
-    var cartao = document.createElement('div');
-    cartao.className = 'resultado-cartao ok';
-    cartao.appendChild(criarCabecalhoResultado('Pausas da loja ' + merchantId, null));
+  // --- Pausas (reaproveitado tanto no detalhe da loja quanto em cartões) ---
 
-    if (pausas.length === 0) {
-      var vazio = document.createElement('p');
-      vazio.textContent = 'Nenhuma pausa ativa ou futura no momento.';
-      cartao.appendChild(vazio);
-      return cartao;
-    }
-
+  function criarListaPausasElemento(merchantId, pausas, aoRemover) {
     var listaPausas = document.createElement('div');
     listaPausas.className = 'lista-pausas';
-
     pausas.forEach(function (pausa) {
       var item = document.createElement('div');
       item.className = 'pausa-item';
@@ -340,48 +389,316 @@
       botaoRemover.type = 'button';
       botaoRemover.textContent = 'Remover esta pausa';
       botaoRemover.addEventListener('click', function () {
-        removerPausaDaLista(merchantId, pausa.id, botaoRemover);
+        botaoRemover.disabled = true;
+        botaoRemover.textContent = 'Removendo...';
+        chamarAcao('remover-pausa', { merchantId: merchantId, interruptionId: pausa.id }).then(function (resultado) {
+          adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['remover-pausa'], resultado.resposta.ok, resultado.corpo));
+          setTimeout(aoRemover, 6000);
+        }).catch(function () {
+          botaoRemover.disabled = false;
+          botaoRemover.textContent = 'Remover esta pausa';
+        });
       });
       item.appendChild(botaoRemover);
 
       listaPausas.appendChild(item);
     });
-
-    cartao.appendChild(listaPausas);
-    return cartao;
+    return listaPausas;
   }
 
-  function mostrarResultadoPausas(merchantId, resultado) {
-    var pausas = null;
-    try { pausas = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
-    if (resultado.resposta.ok && Array.isArray(pausas)) {
-      adicionarResultado(criarCartaoListaPausas(merchantId, pausas));
-    } else {
-      adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['listar-pausas'], resultado.resposta.ok, resultado.corpo));
+  // --- Horário de funcionamento ---
+
+  function extrairShifts(dados) {
+    if (Array.isArray(dados)) return dados;
+    if (dados && Array.isArray(dados.shifts)) return dados.shifts;
+    return null;
+  }
+
+  function renderizarHorarios(dados) {
+    var shifts = extrairShifts(dados);
+    if (!shifts) return renderizarValor(dados);
+    if (shifts.length === 0) {
+      var vazio = document.createElement('p');
+      vazio.textContent = 'Nenhum horário configurado.';
+      return vazio;
     }
+    var copia = shifts.slice().sort(function (a, b) {
+      return ORDEM_DIAS.indexOf(a.dayOfWeek) - ORDEM_DIAS.indexOf(b.dayOfWeek);
+    });
+    var lista = document.createElement('ul');
+    lista.className = 'lista-horarios';
+    copia.forEach(function (shift) {
+      var li = document.createElement('li');
+      var dia = DIAS_PT[shift.dayOfWeek] || shift.dayOfWeek;
+      var inicio = (shift.start || '').slice(0, 5);
+      var fim = shift.end ? shift.end.slice(0, 5)
+        : (shift.duration != null ? somarMinutos(inicio, shift.duration) : '?');
+      li.textContent = dia + ': ' + inicio + ' – ' + fim;
+      lista.appendChild(li);
+    });
+    return lista;
   }
 
-  function atualizarListaPausas(merchantId) {
-    chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
-      mostrarResultadoPausas(merchantId, resultado);
+  // --- Detalhe de uma loja selecionada na tabela (pausas + horário) ---
+
+  function mostrarDetalheLoja(merchantId, nomeLoja) {
+    var detalhe = elemento('detalhe-loja');
+    detalhe.style.display = 'block';
+    detalhe.innerHTML = '';
+
+    var titulo = document.createElement('div');
+    titulo.className = 'secao-titulo';
+    titulo.textContent = nomeLoja;
+    detalhe.appendChild(titulo);
+
+    var secaoPausas = document.createElement('div');
+    secaoPausas.innerHTML = '<p class="resultado-vazio">Carregando pausas...</p>';
+    detalhe.appendChild(secaoPausas);
+
+    var secaoHorario = document.createElement('div');
+    secaoHorario.innerHTML = '<p class="resultado-vazio">Carregando horário...</p>';
+    detalhe.appendChild(secaoHorario);
+
+    function recarregarPausas() {
+      chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
+        secaoPausas.innerHTML = '';
+
+        var cabecalho = document.createElement('div');
+        cabecalho.className = 'resultado-cabecalho';
+        var tituloPausas = document.createElement('div');
+        tituloPausas.className = 'secao-titulo';
+        tituloPausas.textContent = 'Pausas';
+        cabecalho.appendChild(tituloPausas);
+
+        var botaoCriarPausa = document.createElement('button');
+        botaoCriarPausa.className = 'secundario';
+        botaoCriarPausa.type = 'button';
+        botaoCriarPausa.textContent = 'Criar pausa';
+        botaoCriarPausa.addEventListener('click', function () {
+          botaoCriarPausa.disabled = true;
+          chamarAcao('criar-pausa-teste', { merchantId: merchantId }).then(function (resCriar) {
+            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['criar-pausa-teste'], resCriar.resposta.ok, resCriar.corpo));
+            if (resCriar.resposta.ok) {
+              setTimeout(recarregarPausas, 6000);
+            } else {
+              botaoCriarPausa.disabled = false;
+            }
+          }).catch(function () { botaoCriarPausa.disabled = false; });
+        });
+        cabecalho.appendChild(botaoCriarPausa);
+        secaoPausas.appendChild(cabecalho);
+
+        var pausas = null;
+        try { pausas = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+
+        if (resultado.resposta.ok && Array.isArray(pausas)) {
+          if (pausas.length === 0) {
+            var semPausas = document.createElement('p');
+            semPausas.textContent = 'Nenhuma pausa cadastrada.';
+            secaoPausas.appendChild(semPausas);
+          } else {
+            secaoPausas.appendChild(criarListaPausasElemento(merchantId, pausas, recarregarPausas));
+          }
+        } else {
+          var erroPausas = document.createElement('p');
+          erroPausas.textContent = 'Não foi possível carregar as pausas.';
+          secaoPausas.appendChild(erroPausas);
+        }
+      });
+    }
+
+    function carregarHorario() {
+      chamarAcao('consultar-horario', { merchantId: merchantId }).then(function (resultado) {
+        secaoHorario.innerHTML = '';
+
+        var tituloHorario = document.createElement('div');
+        tituloHorario.className = 'secao-titulo';
+        tituloHorario.textContent = 'Horário de funcionamento';
+        secaoHorario.appendChild(tituloHorario);
+
+        var dados = null;
+        try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+        if (resultado.resposta.ok && dados) {
+          secaoHorario.appendChild(renderizarHorarios(dados));
+        } else {
+          var erroHorario = document.createElement('p');
+          erroHorario.textContent = 'Não foi possível carregar o horário.';
+          secaoHorario.appendChild(erroHorario);
+        }
+
+        var botaoConfigurar = document.createElement('button');
+        botaoConfigurar.className = 'secundario';
+        botaoConfigurar.type = 'button';
+        botaoConfigurar.textContent = 'Configurar horário de funcionamento';
+        botaoConfigurar.addEventListener('click', function () {
+          botaoConfigurar.disabled = true;
+          chamarAcao('configurar-horario-teste', { merchantId: merchantId }).then(function (resConfig) {
+            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['configurar-horario-teste'], resConfig.resposta.ok, resConfig.corpo));
+            botaoConfigurar.disabled = false;
+            if (resConfig.resposta.ok) carregarHorario();
+          }).catch(function () { botaoConfigurar.disabled = false; });
+        });
+        secaoHorario.appendChild(botaoConfigurar);
+
+        var descricao = document.createElement('p');
+        descricao.className = 'descricao-acao';
+        descricao.textContent = 'Aplica: sábado 10h–19h; domingo 09h–12h, 13h–16h e 17h–23h.';
+        secaoHorario.appendChild(descricao);
+      });
+    }
+
+    recarregarPausas();
+    carregarHorario();
+  }
+
+  // --- Tabela da aba Painel: lojas ativas na monitoração + status ---
+
+  function carregarTabelaLojas() {
+    var corpo = elemento('corpo-tabela-lojas');
+    corpo.innerHTML = '';
+    elemento('tabela-lojas-vazia').style.display = 'none';
+    elemento('detalhe-loja').style.display = 'none';
+    elemento('detalhe-loja').innerHTML = '';
+
+    chamarAcao('listar-lojas-cadastradas', {}).then(function (resultado) {
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      if (!resultado.resposta.ok || !dados || !Array.isArray(dados.lojas)) {
+        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['listar-lojas-cadastradas'], false, resultado.corpo));
+        return;
+      }
+
+      var ativas = dados.lojas.filter(function (loja) { return loja.ativo; });
+      if (ativas.length === 0) {
+        elemento('tabela-lojas-vazia').style.display = 'block';
+        return;
+      }
+
+      ativas.forEach(function (loja) {
+        var linha = document.createElement('tr');
+        linha.className = 'linha-loja';
+
+        var celulaNome = document.createElement('td');
+        celulaNome.textContent = loja.nome;
+        linha.appendChild(celulaNome);
+
+        var celulaStatus = document.createElement('td');
+        var seloStatus = document.createElement('span');
+        seloStatus.className = 'status-badge status-neutro';
+        seloStatus.textContent = 'Consultando...';
+        celulaStatus.appendChild(seloStatus);
+        linha.appendChild(celulaStatus);
+
+        linha.addEventListener('click', function () {
+          var selecionadas = document.querySelectorAll('.linha-loja.selecionada');
+          for (var s = 0; s < selecionadas.length; s++) selecionadas[s].classList.remove('selecionada');
+          linha.classList.add('selecionada');
+          mostrarDetalheLoja(loja.merchant_id, loja.nome);
+        });
+
+        corpo.appendChild(linha);
+
+        chamarAcao('consultar-status', { merchantId: loja.merchant_id }).then(function (resultadoStatus) {
+          var itens = null;
+          try { itens = JSON.parse(resultadoStatus.corpo); } catch (e) { /* segue nulo */ }
+          var estado = null;
+          if (resultadoStatus.resposta.ok && Array.isArray(itens)) {
+            var principal = itens.filter(function (i) { return i.operation === 'DELIVERY'; })[0] || itens[0];
+            estado = principal ? principal.state : null;
+          }
+          seloStatus.className = 'status-badge ' + (estado === 'OK' ? 'status-ok' : 'status-alerta');
+          seloStatus.textContent = estado || 'Indisponível';
+        });
+      });
     });
   }
 
-  // Remove uma pausa específica (chamada pelo botão de cada item da lista) e,
-  // depois de alguns segundos (a API do iFood demora pra refletir a remoção),
-  // atualiza a lista automaticamente.
-  function removerPausaDaLista(merchantId, interruptionId, botao) {
-    botao.disabled = true;
-    botao.textContent = 'Removendo...';
-    chamarAcao('remover-pausa', { merchantId: merchantId, interruptionId: interruptionId })
-      .then(function (resultado) {
-        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['remover-pausa'], resultado.resposta.ok, resultado.corpo));
-        setTimeout(function () { atualizarListaPausas(merchantId); }, 6000);
-      })
-      .catch(function () {
-        botao.disabled = false;
-        botao.textContent = 'Remover esta pausa';
+  // --- Aba Lojas: incluir/remover lojas da monitoração ---
+
+  function carregarGestaoLojas() {
+    var corpo = elemento('corpo-tabela-gestao-lojas');
+    corpo.innerHTML = '<tr><td colspan="3">Carregando...</td></tr>';
+
+    chamarAcao('listar-lojas-cadastradas', {}).then(function (resultado) {
+      corpo.innerHTML = '';
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      if (!resultado.resposta.ok || !dados || !Array.isArray(dados.lojas) || dados.lojas.length === 0) {
+        corpo.innerHTML = '<tr><td colspan="3">Nenhuma loja cadastrada ainda.</td></tr>';
+        return;
+      }
+
+      dados.lojas.forEach(function (loja) {
+        var linha = document.createElement('tr');
+
+        var celulaNome = document.createElement('td');
+        celulaNome.textContent = loja.nome;
+        linha.appendChild(celulaNome);
+
+        var celulaStatus = document.createElement('td');
+        var selo = document.createElement('span');
+        selo.className = 'status-badge ' + (loja.ativo ? 'status-ok' : 'status-neutro');
+        selo.textContent = loja.ativo ? 'Monitorando' : 'Fora da monitoração';
+        celulaStatus.appendChild(selo);
+        linha.appendChild(celulaStatus);
+
+        var celulaAcao = document.createElement('td');
+        var botao = document.createElement('button');
+        botao.className = loja.ativo ? 'perigo' : 'secundario';
+        botao.type = 'button';
+        botao.textContent = loja.ativo ? 'Remover' : 'Reativar';
+        botao.addEventListener('click', function () {
+          botao.disabled = true;
+          var acaoBotao = loja.ativo ? 'remover-loja' : 'cadastrar-loja';
+          chamarAcao(acaoBotao, { merchantId: loja.merchant_id, nome: loja.nome }).then(function (resultadoAcao) {
+            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO[acaoBotao], resultadoAcao.resposta.ok, resultadoAcao.corpo));
+            carregarGestaoLojas();
+          }).catch(function () { botao.disabled = false; });
+        });
+        celulaAcao.appendChild(botao);
+        linha.appendChild(celulaAcao);
+
+        corpo.appendChild(linha);
       });
+    });
+  }
+
+  elemento('botao-incluir-loja').addEventListener('click', function () {
+    var merchantId = elemento('campo-nova-loja-id').value.trim();
+    var nome = elemento('campo-nova-loja-nome').value.trim();
+    if (!merchantId) return;
+    var params = { merchantId: merchantId };
+    if (nome) params.nome = nome;
+
+    var botao = elemento('botao-incluir-loja');
+    botao.disabled = true;
+    chamarAcao('cadastrar-loja', params).then(function (resultado) {
+      adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['cadastrar-loja'], resultado.resposta.ok, resultado.corpo));
+      botao.disabled = false;
+      if (resultado.resposta.ok) {
+        elemento('campo-nova-loja-id').value = '';
+        elemento('campo-nova-loja-nome').value = '';
+        carregarGestaoLojas();
+      }
+    }).catch(function () { botao.disabled = false; });
+  });
+
+  // --- Abas ---
+
+  var botoesAba = document.querySelectorAll('.aba-botao');
+  for (var a = 0; a < botoesAba.length; a++) {
+    botoesAba[a].addEventListener('click', function (evento) {
+      var alvo = evento.currentTarget.getAttribute('data-aba');
+      var todasAbas = document.querySelectorAll('.aba-botao');
+      for (var b = 0; b < todasAbas.length; b++) todasAbas[b].classList.remove('ativa');
+      evento.currentTarget.classList.add('ativa');
+
+      var todosConteudos = document.querySelectorAll('.aba-conteudo');
+      for (var c = 0; c < todosConteudos.length; c++) todosConteudos[c].style.display = 'none';
+      elemento('aba-' + alvo).style.display = 'block';
+
+      if (alvo === 'lojas') carregarGestaoLojas();
+    });
   }
 
   // --- Sessão (Supabase Auth) e chamadas à Edge Function ---
@@ -473,44 +790,21 @@
     encerrarSessao();
   });
 
-  var botoesAcao = document.querySelectorAll('[data-acao]');
-  for (var i = 0; i < botoesAcao.length; i++) {
-    botoesAcao[i].addEventListener('click', function (evento) {
+  var botoesAcaoLivre = document.querySelectorAll('[data-acao]');
+  for (var i = 0; i < botoesAcaoLivre.length; i++) {
+    botoesAcaoLivre[i].addEventListener('click', function (evento) {
       var botao = evento.currentTarget;
       var acao = botao.getAttribute('data-acao');
       var params = {};
-      if (botao.getAttribute('data-usa-merchant')) {
-        params.merchantId = elemento('campo-merchant-id').value.trim();
-        if (params.merchantId) {
-          localStorage.setItem(CHAVE_MERCHANT_ID, params.merchantId);
-        }
-      }
       if (botao.getAttribute('data-ignorar-janela')) {
         params.ignorarJanela = 'true';
       }
-
       chamarAcao(acao, params).then(function (resultado) {
-        if (acao === 'listar-pausas') {
-          mostrarResultadoPausas(params.merchantId, resultado);
-          return;
-        }
-
         adicionarResultado(criarCartaoResultado(ROTULOS_ACAO[acao] || acao, resultado.resposta.ok, resultado.corpo));
-
-        // Depois de criar uma pausa, atualiza a lista automaticamente (com
-        // um pequeno atraso, pois a API do iFood demora a refletir).
-        if (acao === 'criar-pausa-teste' && resultado.resposta.ok) {
-          setTimeout(function () { atualizarListaPausas(params.merchantId); }, 6000);
-        }
       }).catch(function () {
         // Sessão expirada já foi tratada (volta pro login); nada mais a fazer.
       });
     });
-  }
-
-  var merchantIdSalvo = localStorage.getItem(CHAVE_MERCHANT_ID);
-  if (merchantIdSalvo) {
-    elemento('campo-merchant-id').value = merchantIdSalvo;
   }
 
   if (localStorage.getItem(CHAVE_ACCESS)) {
