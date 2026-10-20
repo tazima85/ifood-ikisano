@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Painel iFood (Boali)</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 16px;
+    max-width: 680px;
+    margin-inline: auto;
+    background: #f5f5f7;
+    color: #1c1c1e;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  p.subtitulo { color: #666; font-size: 0.85rem; margin: 0 0 20px; }
+  .cartao {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; margin-top: 10px; }
+  input {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #d0d0d5;
+    border-radius: 8px;
+  }
+  button {
+    display: inline-block;
+    margin: 4px 4px 0 0;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    border: none;
+    border-radius: 8px;
+    background: #ff6a00;
+    color: #fff;
+    cursor: pointer;
+  }
+  button.secundario { background: #e4e4e8; color: #1c1c1e; }
+  button:active { opacity: 0.8; }
+  .secao-titulo { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #888; margin: 16px 0 6px; }
+  #erro-login { color: #c0392b; font-size: 0.85rem; margin-top: 8px; display: none; }
+  #saida {
+    background: #1c1c1e;
+    color: #d6d6d8;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+  header { display: flex; justify-content: space-between; align-items: baseline; }
+</style>
+</head>
+<body>
+
+  <div id="tela-login" class="cartao">
+    <h1>Painel iFood (Boali)</h1>
+    <p class="subtitulo">Entre com seu email e senha (cadastrados no Supabase Auth do projeto) para acessar o painel.</p>
+    <label for="campo-email-login">Email</label>
+    <input id="campo-email-login" type="email" autocomplete="username" placeholder="seu@email.com" />
+    <label for="campo-senha-login">Senha</label>
+    <input id="campo-senha-login" type="password" autocomplete="current-password" />
+    <button id="botao-entrar" type="button">Entrar</button>
+    <div id="erro-login"></div>
+  </div>
+
+  <div id="painel" style="display:none;">
+    <header>
+      <h1>Painel iFood (Boali)</h1>
+      <button class="secundario" id="botao-sair" type="button">Sair</button>
+    </header>
+    <p class="subtitulo">Chama as ações da Edge Function ifood-pausas direto, sem precisar de curl.</p>
+
+    <div class="cartao">
+      <label for="campo-merchant-id">Merchant ID</label>
+      <input id="campo-merchant-id" type="text" value="97686e5c-fa8d-430d-a036-8c412613aaba" />
+      <label for="campo-interruption-id">Interruption ID (só para remover pausa)</label>
+      <input id="campo-interruption-id" type="text" placeholder="id retornado por 'Criar pausa de teste' ou 'Listar pausas'" />
+
+      <div class="secao-titulo">Loja</div>
+      <button data-acao="listar-lojas" type="button">Listar lojas</button>
+      <button data-acao="detalhes-loja" data-usa-merchant="1" type="button">Detalhes da loja</button>
+      <button data-acao="consultar-status" data-usa-merchant="1" type="button">Consultar status</button>
+
+      <div class="secao-titulo">Horário de funcionamento</div>
+      <button data-acao="consultar-horario" data-usa-merchant="1" type="button">Consultar horário</button>
+      <button data-acao="configurar-horario-teste" data-usa-merchant="1" type="button">Configurar horário (homologação)</button>
+
+      <div class="secao-titulo">Pausas</div>
+      <button data-acao="criar-pausa-teste" data-usa-merchant="1" type="button">Criar pausa de teste</button>
+      <button data-acao="listar-pausas" data-usa-merchant="1" type="button">Listar pausas</button>
+      <button data-acao="remover-pausa" data-usa-merchant="1" data-usa-interruption="1" type="button">Remover pausa</button>
+
+      <div class="secao-titulo">WhatsApp</div>
+      <button data-acao="teste-whatsapp" type="button">Enviar teste</button>
+
+      <div class="secao-titulo">Monitoramento</div>
+      <button data-acao="monitorar" data-ignorar-janela="1" type="button">Rodar agora (ignorando janela)</button>
+    </div>
+
+    <div class="cartao">
+      <div class="secao-titulo">Resultado das chamadas</div>
+      <pre id="saida">Nenhuma chamada feita ainda.</pre>
+    </div>
+  </div>
+
+<script>
+  // Configuração do projeto Supabase "Reports Boali". A anon key NÃO é um
+  // segredo — é a chave pública feita pra ficar embutida em front-ends, só
+  // identifica o projeto; quem autentica de verdade é o login (email/senha)
+  // via Supabase Auth, validado pela Edge Function a cada chamada.
+  var SUPABASE_URL = 'https://fwwebebfagezdqsbybjy.supabase.co';
+  var SUPABASE_ANON_KEY = 'COLOQUE_A_ANON_KEY_AQUI';
+  var FUNCTION_URL = SUPABASE_URL + '/functions/v1/ifood-pausas';
+
+  var CHAVE_ACCESS = 'ifoodPainelAccessToken';
+  var CHAVE_REFRESH = 'ifoodPainelRefreshToken';
+  var historico = [];
+
+  function elemento(id) { return document.getElementById(id); }
+
+  function mostrarPainel() {
+    elemento('tela-login').style.display = 'none';
+    elemento('painel').style.display = 'block';
+  }
+
+  function mostrarLogin(mensagemErro) {
+    elemento('painel').style.display = 'none';
+    elemento('tela-login').style.display = 'block';
+    var erro = elemento('erro-login');
+    if (mensagemErro) {
+      erro.textContent = mensagemErro;
+      erro.style.display = 'block';
+    } else {
+      erro.style.display = 'none';
+    }
+  }
+
+  function registrarSaida(rotulo, url, status, corpo) {
+    var agora = new Date().toLocaleString('pt-BR');
+    var corpoFormatado;
+    try { corpoFormatado = JSON.stringify(JSON.parse(corpo), null, 2); }
+    catch (e) { corpoFormatado = corpo; }
+    var entrada = '[' + agora + '] ' + rotulo + '\n' +
+      'URL: ' + url + '\n' +
+      'Status HTTP: ' + status + '\n' +
+      corpoFormatado;
+    historico.unshift(entrada);
+    historico = historico.slice(0, 20);
+    elemento('saida').textContent = historico.join('\n\n----------------------------\n\n');
+  }
+
+  function fazerLogin(email, senha) {
+    return fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ email: email, password: senha }),
+    }).then(function (resposta) {
+      return resposta.json().then(function (corpo) {
+        if (!resposta.ok || !corpo.access_token) {
+          throw new Error(corpo.error_description || corpo.msg || 'Email ou senha incorretos.');
+        }
+        localStorage.setItem(CHAVE_ACCESS, corpo.access_token);
+        localStorage.setItem(CHAVE_REFRESH, corpo.refresh_token);
+      });
+    });
+  }
+
+  function renovarSessao() {
+    var refreshToken = localStorage.getItem(CHAVE_REFRESH);
+    if (!refreshToken) return Promise.reject(new Error('Sem sessão salva.'));
+    return fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).then(function (resposta) {
+      return resposta.json().then(function (corpo) {
+        if (!resposta.ok || !corpo.access_token) {
+          throw new Error('Sessão expirada.');
+        }
+        localStorage.setItem(CHAVE_ACCESS, corpo.access_token);
+        localStorage.setItem(CHAVE_REFRESH, corpo.refresh_token);
+      });
+    });
+  }
+
+  function encerrarSessao(mensagem) {
+    localStorage.removeItem(CHAVE_ACCESS);
+    localStorage.removeItem(CHAVE_REFRESH);
+    mostrarLogin(mensagem);
+  }
+
+  function chamarAcaoUmaVez(acao, params) {
+    var accessToken = localStorage.getItem(CHAVE_ACCESS);
+    var query = FUNCTION_URL + '?acao=' + encodeURIComponent(acao);
+    for (var chave in params) {
+      if (params[chave]) {
+        query += '&' + encodeURIComponent(chave) + '=' + encodeURIComponent(params[chave]);
+      }
+    }
+    return fetch(query, { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken } })
+      .then(function (resposta) {
+        return resposta.text().then(function (corpo) {
+          return { resposta: resposta, corpo: corpo, query: query };
+        });
+      });
+  }
+
+  // Chama a ação; se der 401 (token expirado), tenta renovar a sessão uma
+  // vez e repete a chamada antes de desistir e voltar pro login.
+  function chamarAcao(acao, params) {
+    return chamarAcaoUmaVez(acao, params).then(function (resultado) {
+      if (resultado.resposta.status === 401) {
+        return renovarSessao().then(function () {
+          return chamarAcaoUmaVez(acao, params);
+        }).catch(function () {
+          encerrarSessao('Sessão expirada. Entre de novo.');
+          throw new Error('Sessão expirada.');
+        });
+      }
+      return resultado;
+    }).then(function (resultado) {
+      registrarSaida(acao, resultado.query, resultado.resposta.status, resultado.corpo);
+      return resultado;
+    });
+  }
+
+  elemento('botao-entrar').addEventListener('click', function () {
+    var email = elemento('campo-email-login').value.trim();
+    var senha = elemento('campo-senha-login').value;
+    if (!email || !senha) return;
+    fazerLogin(email, senha).then(function () {
+      mostrarPainel();
+    }).catch(function (erro) {
+      mostrarLogin(erro.message || 'Não foi possível entrar. Tente de novo.');
+    });
+  });
+
+  elemento('botao-sair').addEventListener('click', function () {
+    encerrarSessao();
+  });
+
+  var botoesAcao = document.querySelectorAll('[data-acao]');
+  for (var i = 0; i < botoesAcao.length; i++) {
+    botoesAcao[i].addEventListener('click', function (evento) {
+      var botao = evento.currentTarget;
+      var acao = botao.getAttribute('data-acao');
+      var params = {};
+      if (botao.getAttribute('data-usa-merchant')) {
+        params.merchantId = elemento('campo-merchant-id').value.trim();
+      }
+      if (botao.getAttribute('data-usa-interruption')) {
+        params.interruptionId = elemento('campo-interruption-id').value.trim();
+      }
+      if (botao.getAttribute('data-ignorar-janela')) {
+        params.ignorarJanela = 'true';
+      }
+      chamarAcao(acao, params);
+    });
+  }
+
+  if (localStorage.getItem(CHAVE_ACCESS)) {
+    mostrarPainel();
+  } else {
+    mostrarLogin();
+  }
+</script>
+</body>
+</html>
