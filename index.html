@@ -302,9 +302,13 @@
     if (!iso) return '—';
     var data = new Date(iso);
     if (isNaN(data.getTime())) return iso;
-    // Fixo em America/Sao_Paulo, independente do fuso do dispositivo de
-    // quem está vendo o painel.
-    return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    // "start"/"end" chegam da iFood como os dígitos locais da loja com
+    // sufixo "Z" (a API não converte fuso de verdade — ver
+    // criarFormularioPausa). Por isso lemos os componentes em UTC aqui: são
+    // exatamente os dígitos originais, sem nenhuma conversão de fuso.
+    return pad(data.getUTCDate()) + '/' + pad(data.getUTCMonth() + 1) + '/' + data.getUTCFullYear()
+      + ' ' + pad(data.getUTCHours()) + ':' + pad(data.getUTCMinutes());
   }
 
   function somarMinutos(horaStr, minutos) {
@@ -459,12 +463,13 @@
 
     botaoSalvar.addEventListener('click', function () {
       if (!campoInicio.value || !campoFim.value) return;
-      // O <input type="datetime-local"> não carrega fuso horário — o valor
-      // digitado é sempre tratado como horário de Brasília (America/Sao_Paulo,
-      // sem horário de verão desde 2019), não o fuso do navegador/dispositivo
-      // de quem está usando o painel.
-      var inicioIso = new Date(campoInicio.value + ':00-03:00').toISOString();
-      var fimIso = new Date(campoFim.value + ':00-03:00').toISOString();
+      // A API de interrupções da iFood não converte fuso horário: trata os
+      // dígitos de "start"/"end" como o horário local da loja, mesmo com
+      // sufixo "Z" (confirmado testando — converter pra UTC de verdade faz
+      // a pausa cair 3h à frente do horário escolhido). Por isso envia os
+      // dígitos exatamente como digitados, sem nenhuma conta de fuso.
+      var inicioIso = campoInicio.value + ':00.000Z';
+      var fimIso = campoFim.value + ':00.000Z';
       botaoSalvar.disabled = true;
       chamarAcao('criar-pausa', {
         merchantId: merchantId,
