@@ -83,7 +83,7 @@
 
     <div class="cartao">
       <label for="campo-merchant-id">Merchant ID</label>
-      <input id="campo-merchant-id" type="text" value="97686e5c-fa8d-430d-a036-8c412613aaba" />
+      <input id="campo-merchant-id" type="text" placeholder="id da loja (fica salvo só neste navegador)" />
       <label for="campo-interruption-id">Interruption ID (só para remover pausa)</label>
       <input id="campo-interruption-id" type="text" placeholder="id retornado por 'Criar pausa de teste' ou 'Listar pausas'" />
 
@@ -126,6 +126,7 @@
 
   var CHAVE_ACCESS = 'ifoodPainelAccessToken';
   var CHAVE_REFRESH = 'ifoodPainelRefreshToken';
+  var CHAVE_MERCHANT_ID = 'ifoodPainelMerchantId';
   var historico = [];
 
   function elemento(id) { return document.getElementById(id); }
@@ -259,6 +260,9 @@
       var params = {};
       if (botao.getAttribute('data-usa-merchant')) {
         params.merchantId = elemento('campo-merchant-id').value.trim();
+        if (params.merchantId) {
+          localStorage.setItem(CHAVE_MERCHANT_ID, params.merchantId);
+        }
       }
       if (botao.getAttribute('data-usa-interruption')) {
         params.interruptionId = elemento('campo-interruption-id').value.trim();
@@ -268,6 +272,11 @@
       }
       chamarAcao(acao, params);
     });
+  }
+
+  var merchantIdSalvo = localStorage.getItem(CHAVE_MERCHANT_ID);
+  if (merchantIdSalvo) {
+    elemento('campo-merchant-id').value = merchantIdSalvo;
   }
 
   if (localStorage.getItem(CHAVE_ACCESS)) {
