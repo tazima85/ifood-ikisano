@@ -17,6 +17,7 @@
   }
   h1 { font-size: 1.25rem; margin: 0 0 4px; }
   p.subtitulo { color: #666; font-size: 0.85rem; margin: 0 0 20px; }
+  p.descricao-acao { color: #888; font-size: 0.78rem; margin: 4px 0 10px; }
   .cartao {
     background: #fff;
     border-radius: 12px;
@@ -44,21 +45,59 @@
     cursor: pointer;
   }
   button.secundario { background: #e4e4e8; color: #1c1c1e; }
+  button.perigo { background: #fdeeec; color: #c0392b; }
   button:active { opacity: 0.8; }
+  button:disabled { opacity: 0.5; cursor: default; }
   .secao-titulo { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: #888; margin: 16px 0 6px; }
   #erro-login { color: #c0392b; font-size: 0.85rem; margin-top: 8px; display: none; }
-  #saida {
-    background: #1c1c1e;
-    color: #d6d6d8;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 0.78rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 360px;
-    overflow-y: auto;
-  }
   header { display: flex; justify-content: space-between; align-items: baseline; }
+
+  #resultados { display: flex; flex-direction: column; gap: 10px; }
+  .resultado-vazio { color: #888; font-size: 0.85rem; margin: 0; }
+  .resultado-cartao {
+    background: #fafafa;
+    border: 1px solid #e4e4e8;
+    border-left: 4px solid #ccc;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.85rem;
+  }
+  .resultado-cartao.ok { border-left-color: #2e9e4f; }
+  .resultado-cartao.erro { border-left-color: #c0392b; }
+  .resultado-cabecalho {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .resultado-cabecalho strong { font-size: 0.9rem; }
+  .status-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #e8f5ea;
+    color: #2e9e4f;
+  }
+  .resultado-cartao.erro .status-badge { background: #fbe7e4; color: #c0392b; }
+  .resultado-hora { color: #999; font-size: 0.72rem; margin-left: auto; }
+  dl.campos { margin: 0; }
+  dl.campos dt { font-weight: 600; color: #555; margin-top: 6px; font-size: 0.78rem; }
+  dl.campos dd { margin: 0; color: #1c1c1e; word-break: break-word; }
+  dl.campos dl.campos { margin-left: 10px; border-left: 2px solid #eee; padding-left: 8px; }
+  .lista-valores { margin: 0; padding-left: 18px; }
+  .resultado-corpo p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+  .lista-pausas .pausa-item + .pausa-item {
+    border-top: 1px solid #eee;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  .pausa-descricao { font-weight: 600; }
+  .pausa-periodo { color: #666; font-size: 0.78rem; margin: 2px 0 8px; }
 </style>
 </head>
 <body>
@@ -84,8 +123,6 @@
     <div class="cartao">
       <label for="campo-merchant-id">Merchant ID</label>
       <input id="campo-merchant-id" type="text" placeholder="id da loja (fica salvo só neste navegador)" />
-      <label for="campo-interruption-id">Interruption ID (opcional pra remover pausa)</label>
-      <input id="campo-interruption-id" type="text" placeholder="deixe em branco para buscar automaticamente (só funciona se houver 1 pausa ativa)" />
 
       <div class="secao-titulo">Loja</div>
       <button data-acao="listar-lojas" type="button">Listar lojas</button>
@@ -94,23 +131,25 @@
 
       <div class="secao-titulo">Horário de funcionamento</div>
       <button data-acao="consultar-horario" data-usa-merchant="1" type="button">Consultar horário</button>
-      <button data-acao="configurar-horario-teste" data-usa-merchant="1" type="button">Configurar horário (homologação)</button>
+      <button data-acao="configurar-horario-teste" data-usa-merchant="1" type="button">Configurar horário de funcionamento</button>
+      <p class="descricao-acao">Aplica: sábado 10h–19h; domingo 09h–12h, 13h–16h e 17h–23h.</p>
 
       <div class="secao-titulo">Pausas</div>
-      <button data-acao="criar-pausa-teste" data-usa-merchant="1" type="button">Criar pausa de teste</button>
+      <button data-acao="criar-pausa-teste" data-usa-merchant="1" type="button">Criar pausa</button>
       <button data-acao="listar-pausas" data-usa-merchant="1" type="button">Listar pausas</button>
-      <button data-acao="remover-pausa" data-usa-merchant="1" data-usa-interruption="1" type="button">Remover pausa</button>
 
       <div class="secao-titulo">WhatsApp</div>
-      <button data-acao="teste-whatsapp" type="button">Enviar teste</button>
+      <button data-acao="teste-whatsapp" type="button">Enviar mensagem de verificação</button>
 
       <div class="secao-titulo">Monitoramento</div>
-      <button data-acao="monitorar" data-ignorar-janela="1" type="button">Rodar agora (ignorando janela)</button>
+      <button data-acao="monitorar" data-ignorar-janela="1" type="button">Rodar monitoramento agora</button>
     </div>
 
     <div class="cartao">
       <div class="secao-titulo">Resultado das chamadas</div>
-      <pre id="saida">Nenhuma chamada feita ainda.</pre>
+      <div id="resultados">
+        <p class="resultado-vazio">Nenhuma chamada feita ainda.</p>
+      </div>
     </div>
   </div>
 
@@ -127,7 +166,19 @@
   var CHAVE_ACCESS = 'ifoodPainelAccessToken';
   var CHAVE_REFRESH = 'ifoodPainelRefreshToken';
   var CHAVE_MERCHANT_ID = 'ifoodPainelMerchantId';
-  var historico = [];
+
+  var ROTULOS_ACAO = {
+    'listar-lojas': 'Listar lojas',
+    'detalhes-loja': 'Detalhes da loja',
+    'consultar-status': 'Consultar status',
+    'consultar-horario': 'Consultar horário',
+    'configurar-horario-teste': 'Configurar horário de funcionamento',
+    'criar-pausa-teste': 'Criar pausa',
+    'listar-pausas': 'Listar pausas',
+    'remover-pausa': 'Remover pausa',
+    'teste-whatsapp': 'Enviar mensagem de verificação',
+    'monitorar': 'Rodar monitoramento',
+  };
 
   function elemento(id) { return document.getElementById(id); }
 
@@ -148,19 +199,192 @@
     }
   }
 
-  function registrarSaida(rotulo, url, status, corpo) {
-    var agora = new Date().toLocaleString('pt-BR');
-    var corpoFormatado;
-    try { corpoFormatado = JSON.stringify(JSON.parse(corpo), null, 2); }
-    catch (e) { corpoFormatado = corpo; }
-    var entrada = '[' + agora + '] ' + rotulo + '\n' +
-      'URL: ' + url + '\n' +
-      'Status HTTP: ' + status + '\n' +
-      corpoFormatado;
-    historico.unshift(entrada);
-    historico = historico.slice(0, 20);
-    elemento('saida').textContent = historico.join('\n\n----------------------------\n\n');
+  function formatarDataHora(iso) {
+    if (!iso) return '—';
+    var data = new Date(iso);
+    if (isNaN(data.getTime())) return iso;
+    return data.toLocaleString('pt-BR');
   }
+
+  // --- Renderização dos resultados (cartões legíveis, sem "tela preta") ---
+
+  function adicionarResultado(cartao) {
+    var container = elemento('resultados');
+    var vazio = container.querySelector('.resultado-vazio');
+    if (vazio) vazio.remove();
+    container.insertBefore(cartao, container.firstChild);
+    while (container.children.length > 15) {
+      container.removeChild(container.lastChild);
+    }
+  }
+
+  function renderizarValor(valor) {
+    if (valor === null || valor === undefined || valor === '') {
+      var vazio = document.createElement('span');
+      vazio.textContent = '—';
+      return vazio;
+    }
+    if (Array.isArray(valor)) {
+      if (valor.length === 0) {
+        var listaVazia = document.createElement('span');
+        listaVazia.textContent = '(lista vazia)';
+        return listaVazia;
+      }
+      var lista = document.createElement('ul');
+      lista.className = 'lista-valores';
+      valor.forEach(function (item) {
+        var li = document.createElement('li');
+        li.appendChild(renderizarValor(item));
+        lista.appendChild(li);
+      });
+      return lista;
+    }
+    if (typeof valor === 'object') {
+      return renderizarCampos(valor);
+    }
+    var span = document.createElement('span');
+    span.textContent = String(valor);
+    return span;
+  }
+
+  function renderizarCampos(objeto) {
+    var dl = document.createElement('dl');
+    dl.className = 'campos';
+    Object.keys(objeto).forEach(function (chave) {
+      var dt = document.createElement('dt');
+      dt.textContent = chave;
+      var dd = document.createElement('dd');
+      dd.appendChild(renderizarValor(objeto[chave]));
+      dl.appendChild(dt);
+      dl.appendChild(dd);
+    });
+    return dl;
+  }
+
+  function criarCabecalhoResultado(rotulo, sucesso) {
+    var cabecalho = document.createElement('div');
+    cabecalho.className = 'resultado-cabecalho';
+
+    var titulo = document.createElement('strong');
+    titulo.textContent = rotulo;
+    cabecalho.appendChild(titulo);
+
+    if (sucesso !== null) {
+      var selo = document.createElement('span');
+      selo.className = 'status-badge';
+      selo.textContent = sucesso ? 'Sucesso' : 'Erro';
+      cabecalho.appendChild(selo);
+    }
+
+    var hora = document.createElement('span');
+    hora.className = 'resultado-hora';
+    hora.textContent = new Date().toLocaleString('pt-BR');
+    cabecalho.appendChild(hora);
+
+    return cabecalho;
+  }
+
+  function criarCartaoResultado(rotulo, sucesso, corpoTexto) {
+    var cartao = document.createElement('div');
+    cartao.className = 'resultado-cartao ' + (sucesso ? 'ok' : 'erro');
+    cartao.appendChild(criarCabecalhoResultado(rotulo, sucesso));
+
+    var corpo = document.createElement('div');
+    corpo.className = 'resultado-corpo';
+    var dados;
+    try { dados = JSON.parse(corpoTexto); } catch (e) { dados = null; }
+    if (dados && typeof dados === 'object') {
+      corpo.appendChild(renderizarValor(dados));
+    } else {
+      var paragrafo = document.createElement('p');
+      paragrafo.textContent = corpoTexto;
+      corpo.appendChild(paragrafo);
+    }
+    cartao.appendChild(corpo);
+    return cartao;
+  }
+
+  // Lista de pausas com um botão "Remover" em cada item — já carrega o
+  // merchantId e o interruptionId certos, sem precisar digitar nada.
+  function criarCartaoListaPausas(merchantId, pausas) {
+    var cartao = document.createElement('div');
+    cartao.className = 'resultado-cartao ok';
+    cartao.appendChild(criarCabecalhoResultado('Pausas da loja ' + merchantId, null));
+
+    if (pausas.length === 0) {
+      var vazio = document.createElement('p');
+      vazio.textContent = 'Nenhuma pausa ativa ou futura no momento.';
+      cartao.appendChild(vazio);
+      return cartao;
+    }
+
+    var listaPausas = document.createElement('div');
+    listaPausas.className = 'lista-pausas';
+
+    pausas.forEach(function (pausa) {
+      var item = document.createElement('div');
+      item.className = 'pausa-item';
+
+      var descricao = document.createElement('div');
+      descricao.className = 'pausa-descricao';
+      descricao.textContent = pausa.description || '(sem descrição)';
+      item.appendChild(descricao);
+
+      var periodo = document.createElement('div');
+      periodo.className = 'pausa-periodo';
+      periodo.textContent = formatarDataHora(pausa.start) + ' até ' + formatarDataHora(pausa.end);
+      item.appendChild(periodo);
+
+      var botaoRemover = document.createElement('button');
+      botaoRemover.className = 'perigo';
+      botaoRemover.type = 'button';
+      botaoRemover.textContent = 'Remover esta pausa';
+      botaoRemover.addEventListener('click', function () {
+        removerPausaDaLista(merchantId, pausa.id, botaoRemover);
+      });
+      item.appendChild(botaoRemover);
+
+      listaPausas.appendChild(item);
+    });
+
+    cartao.appendChild(listaPausas);
+    return cartao;
+  }
+
+  function mostrarResultadoPausas(merchantId, resultado) {
+    var pausas = null;
+    try { pausas = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+    if (resultado.resposta.ok && Array.isArray(pausas)) {
+      adicionarResultado(criarCartaoListaPausas(merchantId, pausas));
+    } else {
+      adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['listar-pausas'], resultado.resposta.ok, resultado.corpo));
+    }
+  }
+
+  function atualizarListaPausas(merchantId) {
+    chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
+      mostrarResultadoPausas(merchantId, resultado);
+    });
+  }
+
+  // Remove uma pausa específica (chamada pelo botão de cada item da lista) e,
+  // depois de alguns segundos (a API do iFood demora pra refletir a remoção),
+  // atualiza a lista automaticamente.
+  function removerPausaDaLista(merchantId, interruptionId, botao) {
+    botao.disabled = true;
+    botao.textContent = 'Removendo...';
+    chamarAcao('remover-pausa', { merchantId: merchantId, interruptionId: interruptionId })
+      .then(function (resultado) {
+        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['remover-pausa'], resultado.resposta.ok, resultado.corpo));
+        setTimeout(function () { atualizarListaPausas(merchantId); }, 6000);
+      })
+      .catch(function () {
+        botao.disabled = false;
+        botao.textContent = 'Remover esta pausa';
+      });
+  }
+
+  // --- Sessão (Supabase Auth) e chamadas à Edge Function ---
 
   function fazerLogin(email, senha) {
     return fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
@@ -231,9 +455,6 @@
         });
       }
       return resultado;
-    }).then(function (resultado) {
-      registrarSaida(acao, resultado.query, resultado.resposta.status, resultado.corpo);
-      return resultado;
     });
   }
 
@@ -252,29 +473,6 @@
     encerrarSessao();
   });
 
-  // Se "Remover pausa" for clicado sem Interruption ID preenchido, busca a
-  // lista de pausas da loja primeiro: se houver exatamente uma, usa o id
-  // dela direto; se houver mais de uma, pede pra escolher manualmente (a
-  // API do iFood exige um id específico — não dá pra remover "a pausa" sem
-  // dizer qual, quando existe mais de uma).
-  function resolverInterruptionId(merchantId) {
-    return chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
-      var pausas;
-      try { pausas = JSON.parse(resultado.corpo); }
-      catch (e) { pausas = []; }
-      if (!Array.isArray(pausas) || pausas.length === 0) {
-        throw new Error('Nenhuma pausa encontrada pra essa loja.');
-      }
-      if (pausas.length > 1) {
-        throw new Error(
-          'Mais de uma pausa encontrada (' + pausas.length + ') — veja a lista acima no ' +
-          'resultado e cole o id da pausa certa no campo Interruption ID.',
-        );
-      }
-      return pausas[0].id;
-    });
-  }
-
   var botoesAcao = document.querySelectorAll('[data-acao]');
   for (var i = 0; i < botoesAcao.length; i++) {
     botoesAcao[i].addEventListener('click', function (evento) {
@@ -291,23 +489,22 @@
         params.ignorarJanela = 'true';
       }
 
-      if (botao.getAttribute('data-usa-interruption')) {
-        var interruptionId = elemento('campo-interruption-id').value.trim();
-        if (interruptionId) {
-          params.interruptionId = interruptionId;
-          chamarAcao(acao, params);
-        } else {
-          resolverInterruptionId(params.merchantId).then(function (idEncontrado) {
-            elemento('campo-interruption-id').value = idEncontrado;
-            params.interruptionId = idEncontrado;
-            return chamarAcao(acao, params);
-          }).catch(function (erro) {
-            registrarSaida(acao, '(resolução automática do Interruption ID)', '-', erro.message);
-          });
+      chamarAcao(acao, params).then(function (resultado) {
+        if (acao === 'listar-pausas') {
+          mostrarResultadoPausas(params.merchantId, resultado);
+          return;
         }
-      } else {
-        chamarAcao(acao, params);
-      }
+
+        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO[acao] || acao, resultado.resposta.ok, resultado.corpo));
+
+        // Depois de criar uma pausa, atualiza a lista automaticamente (com
+        // um pequeno atraso, pois a API do iFood demora a refletir).
+        if (acao === 'criar-pausa-teste' && resultado.resposta.ok) {
+          setTimeout(function () { atualizarListaPausas(params.merchantId); }, 6000);
+        }
+      }).catch(function () {
+        // Sessão expirada já foi tratada (volta pro login); nada mais a fazer.
+      });
     });
   }
 
