@@ -17,7 +17,6 @@
   }
   h1 { font-size: 1.25rem; margin: 0 0 4px; }
   p.subtitulo { color: #666; font-size: 0.85rem; margin: 0 0 20px; }
-  p.descricao-acao { color: #888; font-size: 0.78rem; margin: 4px 0 0; }
   .cartao {
     background: #fff;
     border-radius: 12px;
@@ -77,18 +76,7 @@
   .status-badge.status-alerta { background: #fbe7e4; color: #c0392b; }
   .status-badge.status-neutro { background: #eee; color: #777; }
 
-  #resultados { display: flex; flex-direction: column; gap: 10px; }
   .resultado-vazio { color: #888; font-size: 0.85rem; margin: 0; }
-  .resultado-cartao {
-    background: #fafafa;
-    border: 1px solid #e4e4e8;
-    border-left: 4px solid #ccc;
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 0.85rem;
-  }
-  .resultado-cartao.ok { border-left-color: #2e9e4f; }
-  .resultado-cartao.erro { border-left-color: #c0392b; }
   .resultado-cabecalho {
     display: flex;
     justify-content: space-between;
@@ -97,15 +85,11 @@
     margin-bottom: 8px;
     flex-wrap: wrap;
   }
-  .resultado-cabecalho strong { font-size: 0.9rem; }
-  .resultado-cabecalho .status-badge { margin: 0; }
-  .resultado-hora { color: #999; font-size: 0.72rem; margin-left: auto; }
   dl.campos { margin: 0; }
   dl.campos dt { font-weight: 600; color: #555; margin-top: 6px; font-size: 0.78rem; }
   dl.campos dd { margin: 0; color: #1c1c1e; word-break: break-word; }
   dl.campos dl.campos { margin-left: 10px; border-left: 2px solid #eee; padding-left: 8px; }
   .lista-valores { margin: 0; padding-left: 18px; }
-  .resultado-corpo p { margin: 0; white-space: pre-wrap; word-break: break-word; }
 
   .lista-pausas .pausa-item + .pausa-item {
     border-top: 1px solid #eee;
@@ -127,17 +111,32 @@
   }
   .janela-item + .janela-item { border-top: 1px solid #eee; }
 
-  .linha-dia {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 0;
+  .dia-bloco { padding: 8px 0; border-top: 1px solid #f0f0f0; }
+  .dia-bloco:first-child { border-top: none; padding-top: 0; }
+  .dia-titulo { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+  .turno-linha { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .turno-linha input[type="time"] { width: auto; flex: 0 0 86px; margin: 0; padding: 6px; }
+  .turno-linha button { padding: 4px 10px; margin: 0; }
+
+  #aviso {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    max-width: 90%;
+    background: #1c1c1e;
+    color: #fff;
+    padding: 10px 16px;
+    border-radius: 8px;
     font-size: 0.85rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 100;
   }
-  .linha-dia + .linha-dia { border-top: 1px solid #f0f0f0; }
-  .linha-dia-check { flex: 1; display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
-  .linha-dia-check input { width: auto; }
-  .linha-dia input[type="time"] { width: auto; flex: 0 0 86px; margin: 0; padding: 6px; }
+  #aviso.visivel { opacity: 1; }
+  #aviso.erro { background: #c0392b; }
 </style>
 </head>
 <body>
@@ -193,25 +192,9 @@
       <div class="cartao">
         <div class="secao-titulo">Monitoramento</div>
         <div id="lista-janelas"></div>
-
-        <div class="secao-titulo">Nova janela</div>
-        <label for="campo-janela-descricao">Descrição</label>
-        <input id="campo-janela-descricao" type="text" placeholder="ex.: Pico almoço" />
-        <label for="campo-janela-inicio">Início</label>
-        <input id="campo-janela-inicio" type="time" />
-        <label for="campo-janela-fim">Fim</label>
-        <input id="campo-janela-fim" type="time" />
-        <button id="botao-criar-janela" type="button">Adicionar janela</button>
-
-        <div class="secao-titulo">&nbsp;</div>
+        <button id="botao-abrir-form-janela" class="secundario" type="button">Adicionar janela</button>
+        <div id="area-form-janela"></div>
         <button data-acao="monitorar" data-ignorar-janela="1" type="button">Monitorar agora</button>
-      </div>
-
-      <div class="cartao">
-        <div class="secao-titulo">Resultado das chamadas</div>
-        <div id="resultados">
-          <p class="resultado-vazio">Nenhuma chamada feita ainda.</p>
-        </div>
       </div>
     </div>
 
@@ -235,6 +218,8 @@
     </div>
   </div>
 
+  <div id="aviso"></div>
+
 <script>
   // Configuração do projeto Supabase "Reports Boali". A publishable key NÃO
   // é um segredo — é a chave feita pra ficar embutida em front-ends (o
@@ -252,7 +237,6 @@
     'listar-lojas-cadastradas': 'Listar lojas monitoradas',
     'cadastrar-loja': 'Incluir loja',
     'remover-loja': 'Remover loja',
-    'detalhes-loja': 'Detalhes da loja',
     'consultar-status': 'Consultar status',
     'consultar-horario': 'Consultar horário',
     'configurar-horario': 'Configurar horário de funcionamento',
@@ -262,7 +246,7 @@
     'listar-janelas': 'Listar janelas',
     'criar-janela': 'Adicionar janela',
     'remover-janela': 'Remover janela',
-    'monitorar': 'Rodar monitoramento',
+    'monitorar': 'Monitorar agora',
   };
 
   var DIAS_PT = {
@@ -295,6 +279,25 @@
     }
   }
 
+  // --- Aviso (substitui o antigo log de chamadas no rodapé) ---
+
+  var avisoTimeout = null;
+  function mostrarAviso(mensagem, sucesso) {
+    var aviso = elemento('aviso');
+    aviso.textContent = mensagem;
+    aviso.className = sucesso ? 'visivel' : 'visivel erro';
+    if (avisoTimeout) clearTimeout(avisoTimeout);
+    avisoTimeout = setTimeout(function () { aviso.className = ''; }, 4000);
+  }
+
+  function extrairMensagemErro(corpoTexto) {
+    try {
+      var dados = JSON.parse(corpoTexto);
+      if (dados && dados.erro) return dados.erro;
+    } catch (e) { /* não era JSON */ }
+    return corpoTexto;
+  }
+
   function formatarDataHora(iso) {
     if (!iso) return '—';
     var data = new Date(iso);
@@ -324,17 +327,8 @@
     return dias.slice().sort().map(function (d) { return DIAS_SEMANA_ABREV[d] || d; }).join(', ');
   }
 
-  // --- Renderização genérica dos resultados (cartões legíveis) ---
-
-  function adicionarResultado(cartao) {
-    var container = elemento('resultados');
-    var vazio = container.querySelector('.resultado-vazio');
-    if (vazio) vazio.remove();
-    container.insertBefore(cartao, container.firstChild);
-    while (container.children.length > 15) {
-      container.removeChild(container.lastChild);
-    }
-  }
+  // --- Renderização genérica de fallback (quando a resposta não tem um
+  // formato específico já tratado em algum card) ---
 
   function renderizarValor(valor) {
     if (valor === null || valor === undefined || valor === '') {
@@ -379,49 +373,6 @@
     return dl;
   }
 
-  function criarCabecalhoResultado(rotulo, sucesso) {
-    var cabecalho = document.createElement('div');
-    cabecalho.className = 'resultado-cabecalho';
-
-    var titulo = document.createElement('strong');
-    titulo.textContent = rotulo;
-    cabecalho.appendChild(titulo);
-
-    if (sucesso !== null) {
-      var selo = document.createElement('span');
-      selo.className = 'status-badge ' + (sucesso ? 'status-ok' : 'status-alerta');
-      selo.textContent = sucesso ? 'Sucesso' : 'Erro';
-      cabecalho.appendChild(selo);
-    }
-
-    var hora = document.createElement('span');
-    hora.className = 'resultado-hora';
-    hora.textContent = new Date().toLocaleString('pt-BR');
-    cabecalho.appendChild(hora);
-
-    return cabecalho;
-  }
-
-  function criarCartaoResultado(rotulo, sucesso, corpoTexto) {
-    var cartao = document.createElement('div');
-    cartao.className = 'resultado-cartao ' + (sucesso ? 'ok' : 'erro');
-    cartao.appendChild(criarCabecalhoResultado(rotulo, sucesso));
-
-    var corpo = document.createElement('div');
-    corpo.className = 'resultado-corpo';
-    var dados;
-    try { dados = JSON.parse(corpoTexto); } catch (e) { dados = null; }
-    if (dados && typeof dados === 'object') {
-      corpo.appendChild(renderizarValor(dados));
-    } else {
-      var paragrafo = document.createElement('p');
-      paragrafo.textContent = corpoTexto;
-      corpo.appendChild(paragrafo);
-    }
-    cartao.appendChild(corpo);
-    return cartao;
-  }
-
   // --- Pausas ---
 
   function criarListaPausasElemento(merchantId, pausas, aoRemover) {
@@ -449,7 +400,11 @@
         botaoRemover.disabled = true;
         botaoRemover.textContent = 'Removendo...';
         chamarAcao('remover-pausa', { merchantId: merchantId, interruptionId: pausa.id }).then(function (resultado) {
-          adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['remover-pausa'], resultado.resposta.ok, resultado.corpo));
+          if (resultado.resposta.ok) {
+            mostrarAviso('Pausa removida.', true);
+          } else {
+            mostrarAviso('Remover pausa: ' + extrairMensagemErro(resultado.corpo), false);
+          }
           setTimeout(aoRemover, 6000);
         }).catch(function () {
           botaoRemover.disabled = false;
@@ -511,10 +466,11 @@
         inicio: inicioIso,
         fim: fimIso,
       }).then(function (resultado) {
-        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['criar-pausa'], resultado.resposta.ok, resultado.corpo));
         if (resultado.resposta.ok) {
+          mostrarAviso('Pausa criada.', true);
           aoConcluir();
         } else {
+          mostrarAviso('Criar pausa: ' + extrairMensagemErro(resultado.corpo), false);
           botaoSalvar.disabled = false;
         }
       }).catch(function () { botaoSalvar.disabled = false; });
@@ -551,36 +507,34 @@
     areaLista.innerHTML = '<p class="resultado-vazio">Carregando pausas...</p>';
     conteudo.appendChild(areaLista);
 
-    function recarregarListaPausas() {
-      chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
-        areaLista.innerHTML = '';
-        var pausas = null;
-        try { pausas = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
-        if (resultado.resposta.ok && Array.isArray(pausas)) {
-          if (pausas.length === 0) {
-            areaLista.innerHTML = '<p class="resultado-vazio">Nenhuma pausa cadastrada.</p>';
-          } else {
-            areaLista.appendChild(criarListaPausasElemento(merchantId, pausas, recarregarListaPausas));
-          }
+    chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
+      areaLista.innerHTML = '';
+      var pausas = null;
+      try { pausas = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      if (resultado.resposta.ok && Array.isArray(pausas)) {
+        if (pausas.length === 0) {
+          areaLista.innerHTML = '<p class="resultado-vazio">Nenhuma pausa cadastrada.</p>';
         } else {
-          areaLista.innerHTML = '<p class="resultado-vazio">Não foi possível carregar as pausas.</p>';
+          // Atualizar a tela principal inteira é a forma mais simples de
+          // refletir a remoção (o merchantId continua selecionado).
+          areaLista.appendChild(criarListaPausasElemento(merchantId, pausas, carregarTabelaLojas));
         }
-      });
-    }
+      } else {
+        areaLista.innerHTML = '<p class="resultado-vazio">Não foi possível carregar as pausas.</p>';
+      }
+    });
 
     botaoAbrirForm.addEventListener('click', function () {
       areaForm.innerHTML = '';
       areaForm.appendChild(criarFormularioPausa(
         merchantId,
-        function () { areaForm.innerHTML = ''; setTimeout(recarregarListaPausas, 6000); },
+        function () { areaForm.innerHTML = ''; setTimeout(carregarTabelaLojas, 6000); },
         function () { areaForm.innerHTML = ''; },
       ));
     });
-
-    recarregarListaPausas();
   }
 
-  // --- Horário de funcionamento ---
+  // --- Horário de funcionamento (um dia pode ter mais de um turno) ---
 
   function extrairShifts(dados) {
     if (Array.isArray(dados)) return dados;
@@ -597,7 +551,9 @@
       return vazio;
     }
     var copia = shifts.slice().sort(function (a, b) {
-      return ORDEM_DIAS.indexOf(a.dayOfWeek) - ORDEM_DIAS.indexOf(b.dayOfWeek);
+      var diff = ORDEM_DIAS.indexOf(a.dayOfWeek) - ORDEM_DIAS.indexOf(b.dayOfWeek);
+      if (diff !== 0) return diff;
+      return (a.start || '').localeCompare(b.start || '');
     });
     var lista = document.createElement('ul');
     lista.className = 'lista-horarios';
@@ -613,40 +569,67 @@
     return lista;
   }
 
+  function criarLinhaTurno(inicio, fim) {
+    var linha = document.createElement('div');
+    linha.className = 'turno-linha';
+
+    var campoInicio = document.createElement('input');
+    campoInicio.type = 'time';
+    campoInicio.value = inicio || '';
+    linha.appendChild(campoInicio);
+
+    var campoFim = document.createElement('input');
+    campoFim.type = 'time';
+    campoFim.value = fim || '';
+    linha.appendChild(campoFim);
+
+    var botaoRemover = document.createElement('button');
+    botaoRemover.className = 'secundario';
+    botaoRemover.type = 'button';
+    botaoRemover.textContent = '×';
+    botaoRemover.addEventListener('click', function () { linha.remove(); });
+    linha.appendChild(botaoRemover);
+
+    linha.inicioInput = campoInicio;
+    linha.fimInput = campoFim;
+    return linha;
+  }
+
   function criarFormularioHorario(merchantId, shiftsAtuais, aoConcluir, aoCancelar) {
     var form = document.createElement('div');
-    var linhasPorDia = {};
+    var turnosPorDia = {};
 
     ORDEM_DIAS.forEach(function (dia) {
-      var shiftExistente = shiftsAtuais.filter(function (s) { return s.dayOfWeek === dia; })[0];
+      var bloco = document.createElement('div');
+      bloco.className = 'dia-bloco';
 
-      var linha = document.createElement('div');
-      linha.className = 'linha-dia';
+      var titulo = document.createElement('div');
+      titulo.className = 'dia-titulo';
+      titulo.textContent = DIAS_PT[dia];
+      bloco.appendChild(titulo);
 
-      var labelCheck = document.createElement('label');
-      labelCheck.className = 'linha-dia-check';
-      var checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = !!shiftExistente;
-      labelCheck.appendChild(checkbox);
-      labelCheck.appendChild(document.createTextNode(' ' + DIAS_PT[dia]));
-      linha.appendChild(labelCheck);
+      var container = document.createElement('div');
+      container.className = 'dia-turnos';
+      bloco.appendChild(container);
 
-      var campoInicio = document.createElement('input');
-      campoInicio.type = 'time';
-      campoInicio.value = shiftExistente ? (shiftExistente.start || '').slice(0, 5) : '';
-      linha.appendChild(campoInicio);
+      shiftsAtuais.filter(function (s) { return s.dayOfWeek === dia; }).forEach(function (shift) {
+        var inicio = (shift.start || '').slice(0, 5);
+        var fim = shift.end ? shift.end.slice(0, 5)
+          : (shift.duration != null ? somarMinutos(inicio, shift.duration) : '');
+        container.appendChild(criarLinhaTurno(inicio, fim));
+      });
 
-      var campoFim = document.createElement('input');
-      campoFim.type = 'time';
-      campoFim.value = shiftExistente
-        ? (shiftExistente.end ? shiftExistente.end.slice(0, 5)
-          : (shiftExistente.duration != null ? somarMinutos(campoInicio.value, shiftExistente.duration) : ''))
-        : '';
-      linha.appendChild(campoFim);
+      var botaoAdd = document.createElement('button');
+      botaoAdd.className = 'secundario';
+      botaoAdd.type = 'button';
+      botaoAdd.textContent = '+ turno';
+      botaoAdd.addEventListener('click', function () {
+        container.appendChild(criarLinhaTurno('', ''));
+      });
+      bloco.appendChild(botaoAdd);
 
-      form.appendChild(linha);
-      linhasPorDia[dia] = { checkbox: checkbox, inicio: campoInicio, fim: campoFim };
+      form.appendChild(bloco);
+      turnosPorDia[dia] = container;
     });
 
     var botaoSalvar = document.createElement('button');
@@ -665,24 +648,26 @@
       var shifts = [];
       var invalido = false;
       ORDEM_DIAS.forEach(function (dia) {
-        var linha = linhasPorDia[dia];
-        if (!linha.checkbox.checked) return;
-        if (!linha.inicio.value || !linha.fim.value) { invalido = true; return; }
-        shifts.push({
-          dayOfWeek: dia,
-          start: linha.inicio.value + ':00',
-          duration: calcularDuracaoMinutos(linha.inicio.value, linha.fim.value),
-        });
+        var linhas = turnosPorDia[dia].querySelectorAll('.turno-linha');
+        for (var i = 0; i < linhas.length; i++) {
+          var linha = linhas[i];
+          var inicio = linha.inicioInput.value;
+          var fim = linha.fimInput.value;
+          if (!inicio && !fim) continue; // linha vazia, ignora
+          if (!inicio || !fim) { invalido = true; continue; }
+          shifts.push({ dayOfWeek: dia, start: inicio + ':00', duration: calcularDuracaoMinutos(inicio, fim) });
+        }
       });
-      if (invalido) { alert('Preencha início e fim para todos os dias marcados.'); return; }
-      if (shifts.length === 0) { alert('Marque pelo menos um dia.'); return; }
+      if (invalido) { mostrarAviso('Preencha início e fim de cada turno (ou remova a linha).', false); return; }
+      if (shifts.length === 0) { mostrarAviso('Adicione pelo menos um turno.', false); return; }
 
       botaoSalvar.disabled = true;
       chamarAcao('configurar-horario', { merchantId: merchantId }, { shifts: shifts }).then(function (resultado) {
-        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['configurar-horario'], resultado.resposta.ok, resultado.corpo));
         if (resultado.resposta.ok) {
+          mostrarAviso('Horário de funcionamento atualizado.', true);
           aoConcluir();
         } else {
+          mostrarAviso('Configurar horário: ' + extrairMensagemErro(resultado.corpo), false);
           botaoSalvar.disabled = false;
         }
       }).catch(function () { botaoSalvar.disabled = false; });
@@ -715,31 +700,27 @@
 
     var shiftsAtuais = [];
 
-    function carregarHorarioAtual() {
-      chamarAcao('consultar-horario', { merchantId: merchantId }).then(function (resultado) {
-        areaAtual.innerHTML = '';
-        var dados = null;
-        try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
-        shiftsAtuais = extrairShifts(dados) || [];
-        if (resultado.resposta.ok && dados) {
-          areaAtual.appendChild(renderizarHorarios(dados));
-        } else {
-          areaAtual.innerHTML = '<p class="resultado-vazio">Não foi possível carregar o horário.</p>';
-        }
-      });
-    }
+    chamarAcao('consultar-horario', { merchantId: merchantId }).then(function (resultado) {
+      areaAtual.innerHTML = '';
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      shiftsAtuais = extrairShifts(dados) || [];
+      if (resultado.resposta.ok && dados) {
+        areaAtual.appendChild(renderizarHorarios(dados));
+      } else {
+        areaAtual.innerHTML = '<p class="resultado-vazio">Não foi possível carregar o horário.</p>';
+      }
+    });
 
     botaoAbrirForm.addEventListener('click', function () {
       areaForm.innerHTML = '';
       areaForm.appendChild(criarFormularioHorario(
         merchantId,
         shiftsAtuais,
-        function () { areaForm.innerHTML = ''; carregarHorarioAtual(); },
+        function () { areaForm.innerHTML = ''; carregarTabelaLojas(); },
         function () { areaForm.innerHTML = ''; },
       ));
     });
-
-    carregarHorarioAtual();
   }
 
   // --- Monitoramento: janelas (tabela monitoramento_janelas) ---
@@ -782,7 +763,11 @@
         botaoRemover.addEventListener('click', function () {
           botaoRemover.disabled = true;
           chamarAcao('remover-janela', { id: janela.id }).then(function (resultadoRemover) {
-            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['remover-janela'], resultadoRemover.resposta.ok, resultadoRemover.corpo));
+            if (resultadoRemover.resposta.ok) {
+              mostrarAviso('Janela removida.', true);
+            } else {
+              mostrarAviso('Remover janela: ' + extrairMensagemErro(resultadoRemover.corpo), false);
+            }
             carregarJanelas();
           }).catch(function () { botaoRemover.disabled = false; });
         });
@@ -793,24 +778,71 @@
     });
   }
 
-  elemento('botao-criar-janela').addEventListener('click', function () {
-    var descricao = elemento('campo-janela-descricao').value.trim() || 'Janela de monitoramento';
-    var horaInicio = elemento('campo-janela-inicio').value;
-    var horaFim = elemento('campo-janela-fim').value;
-    if (!horaInicio || !horaFim) return;
+  function criarFormularioJanela() {
+    var form = document.createElement('div');
 
-    var botao = elemento('botao-criar-janela');
-    botao.disabled = true;
-    chamarAcao('criar-janela', { descricao: descricao, horaInicio: horaInicio, horaFim: horaFim }).then(function (resultado) {
-      adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['criar-janela'], resultado.resposta.ok, resultado.corpo));
-      botao.disabled = false;
-      if (resultado.resposta.ok) {
-        elemento('campo-janela-descricao').value = '';
-        elemento('campo-janela-inicio').value = '';
-        elemento('campo-janela-fim').value = '';
-        carregarJanelas();
-      }
-    }).catch(function () { botao.disabled = false; });
+    var labelDesc = document.createElement('label');
+    labelDesc.textContent = 'Descrição';
+    form.appendChild(labelDesc);
+    var campoDesc = document.createElement('input');
+    campoDesc.type = 'text';
+    campoDesc.placeholder = 'ex.: Pico almoço';
+    form.appendChild(campoDesc);
+
+    var labelInicio = document.createElement('label');
+    labelInicio.textContent = 'Início';
+    form.appendChild(labelInicio);
+    var campoInicio = document.createElement('input');
+    campoInicio.type = 'time';
+    form.appendChild(campoInicio);
+
+    var labelFim = document.createElement('label');
+    labelFim.textContent = 'Fim';
+    form.appendChild(labelFim);
+    var campoFim = document.createElement('input');
+    campoFim.type = 'time';
+    form.appendChild(campoFim);
+
+    var botaoSalvar = document.createElement('button');
+    botaoSalvar.type = 'button';
+    botaoSalvar.textContent = 'Adicionar janela';
+    form.appendChild(botaoSalvar);
+
+    var botaoCancelar = document.createElement('button');
+    botaoCancelar.className = 'secundario';
+    botaoCancelar.type = 'button';
+    botaoCancelar.textContent = 'Cancelar';
+    botaoCancelar.addEventListener('click', function () { form.remove(); });
+    form.appendChild(botaoCancelar);
+
+    botaoSalvar.addEventListener('click', function () {
+      var horaInicio = campoInicio.value;
+      var horaFim = campoFim.value;
+      if (!horaInicio || !horaFim) return;
+      botaoSalvar.disabled = true;
+      chamarAcao('criar-janela', {
+        descricao: campoDesc.value.trim() || 'Janela de monitoramento',
+        horaInicio: horaInicio,
+        horaFim: horaFim,
+      }).then(function (resultado) {
+        if (resultado.resposta.ok) {
+          mostrarAviso('Janela adicionada.', true);
+          form.remove();
+          carregarJanelas();
+        } else {
+          mostrarAviso('Adicionar janela: ' + extrairMensagemErro(resultado.corpo), false);
+          botaoSalvar.disabled = false;
+        }
+      }).catch(function () { botaoSalvar.disabled = false; });
+    });
+
+    return form;
+  }
+
+  elemento('botao-abrir-form-janela').addEventListener('click', function () {
+    var area = elemento('area-form-janela');
+    area.innerHTML = '';
+    area.appendChild(criarFormularioJanela());
   });
 
   // --- Tabela da aba Painel: lojas ativas na monitoração + status ---
@@ -825,24 +857,29 @@
     var corpo = elemento('corpo-tabela-lojas');
     corpo.innerHTML = '';
     elemento('tabela-lojas-vazia').style.display = 'none';
-    lojaSelecionada = null;
-    atualizarCartaoPausas();
-    atualizarCartaoHorario();
+    var manterMerchantId = lojaSelecionada ? lojaSelecionada.merchantId : null;
 
     chamarAcao('listar-lojas-cadastradas', {}).then(function (resultado) {
       var dados = null;
       try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
       if (!resultado.resposta.ok || !dados || !Array.isArray(dados.lojas)) {
-        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['listar-lojas-cadastradas'], false, resultado.corpo));
+        mostrarAviso('Listar lojas monitoradas: ' + extrairMensagemErro(resultado.corpo), false);
+        lojaSelecionada = null;
+        atualizarCartaoPausas();
+        atualizarCartaoHorario();
         return;
       }
 
       var ativas = dados.lojas.filter(function (loja) { return loja.ativo; });
       if (ativas.length === 0) {
         elemento('tabela-lojas-vazia').style.display = 'block';
+        lojaSelecionada = null;
+        atualizarCartaoPausas();
+        atualizarCartaoHorario();
         return;
       }
 
+      var linhasPorId = {};
       ativas.forEach(function (loja) {
         var linha = document.createElement('tr');
         linha.className = 'linha-loja';
@@ -866,6 +903,7 @@
         });
 
         corpo.appendChild(linha);
+        linhasPorId[loja.merchant_id] = linha;
 
         chamarAcao('consultar-status', { merchantId: loja.merchant_id }).then(function (resultadoStatus) {
           var itens = null;
@@ -879,6 +917,12 @@
           seloStatus.textContent = estado || 'Indisponível';
         });
       });
+
+      // Mantém a loja que já estava selecionada (se ainda existir); senão,
+      // seleciona a primeira da lista por padrão.
+      var lojaParaSelecionar = ativas.filter(function (l) { return l.merchant_id === manterMerchantId; })[0] || ativas[0];
+      linhasPorId[lojaParaSelecionar.merchant_id].classList.add('selecionada');
+      selecionarLoja(lojaParaSelecionar.merchant_id, lojaParaSelecionar.nome);
     });
   }
 
@@ -920,7 +964,11 @@
           botao.disabled = true;
           var acaoBotao = loja.ativo ? 'remover-loja' : 'cadastrar-loja';
           chamarAcao(acaoBotao, { merchantId: loja.merchant_id, nome: loja.nome }).then(function (resultadoAcao) {
-            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO[acaoBotao], resultadoAcao.resposta.ok, resultadoAcao.corpo));
+            if (resultadoAcao.resposta.ok) {
+              mostrarAviso((loja.ativo ? 'Loja removida da monitoração.' : 'Loja reativada.'), true);
+            } else {
+              mostrarAviso(ROTULOS_ACAO[acaoBotao] + ': ' + extrairMensagemErro(resultadoAcao.corpo), false);
+            }
             carregarGestaoLojas();
           }).catch(function () { botao.disabled = false; });
         });
@@ -942,12 +990,14 @@
     var botao = elemento('botao-incluir-loja');
     botao.disabled = true;
     chamarAcao('cadastrar-loja', params).then(function (resultado) {
-      adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['cadastrar-loja'], resultado.resposta.ok, resultado.corpo));
       botao.disabled = false;
       if (resultado.resposta.ok) {
+        mostrarAviso('Loja incluída na monitoração.', true);
         elemento('campo-nova-loja-id').value = '';
         elemento('campo-nova-loja-nome').value = '';
         carregarGestaoLojas();
+      } else {
+        mostrarAviso('Incluir loja: ' + extrairMensagemErro(resultado.corpo), false);
       }
     }).catch(function () { botao.disabled = false; });
   });
@@ -1073,7 +1123,13 @@
         params.ignorarJanela = 'true';
       }
       chamarAcao(acao, params).then(function (resultado) {
-        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO[acao] || acao, resultado.resposta.ok, resultado.corpo));
+        var rotulo = ROTULOS_ACAO[acao] || acao;
+        if (resultado.resposta.ok) {
+          mostrarAviso(rotulo + ': concluído.', true);
+          if (acao === 'monitorar') carregarTabelaLojas();
+        } else {
+          mostrarAviso(rotulo + ': ' + extrairMensagemErro(resultado.corpo), false);
+        }
       }).catch(function () {
         // Sessão expirada já foi tratada (volta pro login); nada mais a fazer.
       });
