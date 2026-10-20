@@ -54,12 +54,7 @@
   header { display: flex; justify-content: space-between; align-items: baseline; }
 
   .abas { display: flex; gap: 4px; margin-bottom: 16px; }
-  .aba-botao {
-    flex: 1;
-    margin: 0;
-    background: #e4e4e8;
-    color: #555;
-  }
+  .aba-botao { flex: 1; margin: 0; background: #e4e4e8; color: #555; }
   .aba-botao.ativa { background: #ff6a00; color: #fff; }
 
   table { width: 100%; border-collapse: collapse; margin-top: 8px; }
@@ -122,6 +117,27 @@
 
   .lista-horarios { margin: 0; padding-left: 18px; font-size: 0.85rem; }
   .lista-horarios li { margin-bottom: 2px; }
+
+  .janela-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+  }
+  .janela-item + .janela-item { border-top: 1px solid #eee; }
+
+  .linha-dia {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 0.85rem;
+  }
+  .linha-dia + .linha-dia { border-top: 1px solid #f0f0f0; }
+  .linha-dia-check { flex: 1; display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
+  .linha-dia-check input { width: auto; }
+  .linha-dia input[type="time"] { width: auto; flex: 0 0 86px; margin: 0; padding: 6px; }
 </style>
 </head>
 <body>
@@ -160,14 +176,35 @@
         </p>
       </div>
 
-      <div id="detalhe-loja" class="cartao" style="display:none;"></div>
+      <div class="cartao">
+        <div class="secao-titulo">Pausas</div>
+        <div id="conteudo-pausas">
+          <p class="resultado-vazio">Selecione uma loja na tabela acima.</p>
+        </div>
+      </div>
 
       <div class="cartao">
-        <div class="secao-titulo">WhatsApp</div>
-        <button data-acao="teste-whatsapp" type="button">Enviar mensagem de verificação</button>
+        <div class="secao-titulo">Horário de funcionamento</div>
+        <div id="conteudo-horario">
+          <p class="resultado-vazio">Selecione uma loja na tabela acima.</p>
+        </div>
+      </div>
 
+      <div class="cartao">
         <div class="secao-titulo">Monitoramento</div>
-        <button data-acao="monitorar" data-ignorar-janela="1" type="button">Rodar monitoramento agora</button>
+        <div id="lista-janelas"></div>
+
+        <div class="secao-titulo">Nova janela</div>
+        <label for="campo-janela-descricao">Descrição</label>
+        <input id="campo-janela-descricao" type="text" placeholder="ex.: Pico almoço" />
+        <label for="campo-janela-inicio">Início</label>
+        <input id="campo-janela-inicio" type="time" />
+        <label for="campo-janela-fim">Fim</label>
+        <input id="campo-janela-fim" type="time" />
+        <button id="botao-criar-janela" type="button">Adicionar janela</button>
+
+        <div class="secao-titulo">&nbsp;</div>
+        <button data-acao="monitorar" data-ignorar-janela="1" type="button">Monitorar agora</button>
       </div>
 
       <div class="cartao">
@@ -218,11 +255,13 @@
     'detalhes-loja': 'Detalhes da loja',
     'consultar-status': 'Consultar status',
     'consultar-horario': 'Consultar horário',
-    'configurar-horario-teste': 'Configurar horário de funcionamento',
-    'criar-pausa-teste': 'Criar pausa',
+    'configurar-horario': 'Configurar horário de funcionamento',
+    'criar-pausa': 'Criar pausa',
     'listar-pausas': 'Listar pausas',
     'remover-pausa': 'Remover pausa',
-    'teste-whatsapp': 'Enviar mensagem de verificação',
+    'listar-janelas': 'Listar janelas',
+    'criar-janela': 'Adicionar janela',
+    'remover-janela': 'Remover janela',
     'monitorar': 'Rodar monitoramento',
   };
 
@@ -231,6 +270,9 @@
     FRIDAY: 'Sexta', SATURDAY: 'Sábado', SUNDAY: 'Domingo',
   };
   var ORDEM_DIAS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+  var DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']; // 0=domingo (igual ao banco)
+
+  var lojaSelecionada = null; // { merchantId, nome }
 
   function elemento(id) { return document.getElementById(id); }
 
@@ -238,6 +280,7 @@
     elemento('tela-login').style.display = 'none';
     elemento('painel').style.display = 'block';
     carregarTabelaLojas();
+    carregarJanelas();
   }
 
   function mostrarLogin(mensagemErro) {
@@ -265,6 +308,20 @@
     var h = Math.floor(totalMin / 60);
     var m = totalMin % 60;
     return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  function calcularDuracaoMinutos(inicio, fim) {
+    var pi = inicio.split(':').map(Number);
+    var pf = fim.split(':').map(Number);
+    var duracao = (pf[0] * 60 + pf[1]) - (pi[0] * 60 + pi[1]);
+    if (duracao <= 0) duracao += 1440; // atravessa a meia-noite
+    return duracao;
+  }
+
+  function formatarDiasSemana(dias) {
+    if (!Array.isArray(dias) || dias.length === 7) return 'Todos os dias';
+    if (dias.length === 0) return '—';
+    return dias.slice().sort().map(function (d) { return DIAS_SEMANA_ABREV[d] || d; }).join(', ');
   }
 
   // --- Renderização genérica dos resultados (cartões legíveis) ---
@@ -365,7 +422,7 @@
     return cartao;
   }
 
-  // --- Pausas (reaproveitado tanto no detalhe da loja quanto em cartões) ---
+  // --- Pausas ---
 
   function criarListaPausasElemento(merchantId, pausas, aoRemover) {
     var listaPausas = document.createElement('div');
@@ -406,6 +463,123 @@
     return listaPausas;
   }
 
+  function criarFormularioPausa(merchantId, aoConcluir, aoCancelar) {
+    var form = document.createElement('div');
+
+    var labelDesc = document.createElement('label');
+    labelDesc.textContent = 'Nome da pausa';
+    form.appendChild(labelDesc);
+    var campoDesc = document.createElement('input');
+    campoDesc.type = 'text';
+    campoDesc.placeholder = 'ex.: Falta de entregador';
+    form.appendChild(campoDesc);
+
+    var labelInicio = document.createElement('label');
+    labelInicio.textContent = 'Início';
+    form.appendChild(labelInicio);
+    var campoInicio = document.createElement('input');
+    campoInicio.type = 'datetime-local';
+    form.appendChild(campoInicio);
+
+    var labelFim = document.createElement('label');
+    labelFim.textContent = 'Fim';
+    form.appendChild(labelFim);
+    var campoFim = document.createElement('input');
+    campoFim.type = 'datetime-local';
+    form.appendChild(campoFim);
+
+    var botaoSalvar = document.createElement('button');
+    botaoSalvar.type = 'button';
+    botaoSalvar.textContent = 'Criar pausa';
+    form.appendChild(botaoSalvar);
+
+    var botaoCancelar = document.createElement('button');
+    botaoCancelar.className = 'secundario';
+    botaoCancelar.type = 'button';
+    botaoCancelar.textContent = 'Cancelar';
+    botaoCancelar.addEventListener('click', aoCancelar);
+    form.appendChild(botaoCancelar);
+
+    botaoSalvar.addEventListener('click', function () {
+      if (!campoInicio.value || !campoFim.value) return;
+      var inicioIso = new Date(campoInicio.value).toISOString();
+      var fimIso = new Date(campoFim.value).toISOString();
+      botaoSalvar.disabled = true;
+      chamarAcao('criar-pausa', {
+        merchantId: merchantId,
+        descricao: campoDesc.value.trim() || 'Pausa',
+        inicio: inicioIso,
+        fim: fimIso,
+      }).then(function (resultado) {
+        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['criar-pausa'], resultado.resposta.ok, resultado.corpo));
+        if (resultado.resposta.ok) {
+          aoConcluir();
+        } else {
+          botaoSalvar.disabled = false;
+        }
+      }).catch(function () { botaoSalvar.disabled = false; });
+    });
+
+    return form;
+  }
+
+  function atualizarCartaoPausas() {
+    var conteudo = elemento('conteudo-pausas');
+    conteudo.innerHTML = '';
+    if (!lojaSelecionada) {
+      conteudo.innerHTML = '<p class="resultado-vazio">Selecione uma loja na tabela acima.</p>';
+      return;
+    }
+    var merchantId = lojaSelecionada.merchantId;
+
+    var cabecalho = document.createElement('div');
+    cabecalho.className = 'resultado-cabecalho';
+    var tituloLoja = document.createElement('strong');
+    tituloLoja.textContent = lojaSelecionada.nome;
+    cabecalho.appendChild(tituloLoja);
+    var botaoAbrirForm = document.createElement('button');
+    botaoAbrirForm.className = 'secundario';
+    botaoAbrirForm.type = 'button';
+    botaoAbrirForm.textContent = 'Criar pausa';
+    cabecalho.appendChild(botaoAbrirForm);
+    conteudo.appendChild(cabecalho);
+
+    var areaForm = document.createElement('div');
+    conteudo.appendChild(areaForm);
+
+    var areaLista = document.createElement('div');
+    areaLista.innerHTML = '<p class="resultado-vazio">Carregando pausas...</p>';
+    conteudo.appendChild(areaLista);
+
+    function recarregarListaPausas() {
+      chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
+        areaLista.innerHTML = '';
+        var pausas = null;
+        try { pausas = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+        if (resultado.resposta.ok && Array.isArray(pausas)) {
+          if (pausas.length === 0) {
+            areaLista.innerHTML = '<p class="resultado-vazio">Nenhuma pausa cadastrada.</p>';
+          } else {
+            areaLista.appendChild(criarListaPausasElemento(merchantId, pausas, recarregarListaPausas));
+          }
+        } else {
+          areaLista.innerHTML = '<p class="resultado-vazio">Não foi possível carregar as pausas.</p>';
+        }
+      });
+    }
+
+    botaoAbrirForm.addEventListener('click', function () {
+      areaForm.innerHTML = '';
+      areaForm.appendChild(criarFormularioPausa(
+        merchantId,
+        function () { areaForm.innerHTML = ''; setTimeout(recarregarListaPausas, 6000); },
+        function () { areaForm.innerHTML = ''; },
+      ));
+    });
+
+    recarregarListaPausas();
+  }
+
   // --- Horário de funcionamento ---
 
   function extrairShifts(dados) {
@@ -439,126 +613,221 @@
     return lista;
   }
 
-  // --- Detalhe de uma loja selecionada na tabela (pausas + horário) ---
+  function criarFormularioHorario(merchantId, shiftsAtuais, aoConcluir, aoCancelar) {
+    var form = document.createElement('div');
+    var linhasPorDia = {};
 
-  function mostrarDetalheLoja(merchantId, nomeLoja) {
-    var detalhe = elemento('detalhe-loja');
-    detalhe.style.display = 'block';
-    detalhe.innerHTML = '';
+    ORDEM_DIAS.forEach(function (dia) {
+      var shiftExistente = shiftsAtuais.filter(function (s) { return s.dayOfWeek === dia; })[0];
 
-    var titulo = document.createElement('div');
-    titulo.className = 'secao-titulo';
-    titulo.textContent = nomeLoja;
-    detalhe.appendChild(titulo);
+      var linha = document.createElement('div');
+      linha.className = 'linha-dia';
 
-    var secaoPausas = document.createElement('div');
-    secaoPausas.innerHTML = '<p class="resultado-vazio">Carregando pausas...</p>';
-    detalhe.appendChild(secaoPausas);
+      var labelCheck = document.createElement('label');
+      labelCheck.className = 'linha-dia-check';
+      var checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = !!shiftExistente;
+      labelCheck.appendChild(checkbox);
+      labelCheck.appendChild(document.createTextNode(' ' + DIAS_PT[dia]));
+      linha.appendChild(labelCheck);
 
-    var secaoHorario = document.createElement('div');
-    secaoHorario.innerHTML = '<p class="resultado-vazio">Carregando horário...</p>';
-    detalhe.appendChild(secaoHorario);
+      var campoInicio = document.createElement('input');
+      campoInicio.type = 'time';
+      campoInicio.value = shiftExistente ? (shiftExistente.start || '').slice(0, 5) : '';
+      linha.appendChild(campoInicio);
 
-    function recarregarPausas() {
-      chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
-        secaoPausas.innerHTML = '';
+      var campoFim = document.createElement('input');
+      campoFim.type = 'time';
+      campoFim.value = shiftExistente
+        ? (shiftExistente.end ? shiftExistente.end.slice(0, 5)
+          : (shiftExistente.duration != null ? somarMinutos(campoInicio.value, shiftExistente.duration) : ''))
+        : '';
+      linha.appendChild(campoFim);
 
-        var cabecalho = document.createElement('div');
-        cabecalho.className = 'resultado-cabecalho';
-        var tituloPausas = document.createElement('div');
-        tituloPausas.className = 'secao-titulo';
-        tituloPausas.textContent = 'Pausas';
-        cabecalho.appendChild(tituloPausas);
+      form.appendChild(linha);
+      linhasPorDia[dia] = { checkbox: checkbox, inicio: campoInicio, fim: campoFim };
+    });
 
-        var botaoCriarPausa = document.createElement('button');
-        botaoCriarPausa.className = 'secundario';
-        botaoCriarPausa.type = 'button';
-        botaoCriarPausa.textContent = 'Criar pausa';
-        botaoCriarPausa.addEventListener('click', function () {
-          botaoCriarPausa.disabled = true;
-          chamarAcao('criar-pausa-teste', { merchantId: merchantId }).then(function (resCriar) {
-            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['criar-pausa-teste'], resCriar.resposta.ok, resCriar.corpo));
-            if (resCriar.resposta.ok) {
-              setTimeout(recarregarPausas, 6000);
-            } else {
-              botaoCriarPausa.disabled = false;
-            }
-          }).catch(function () { botaoCriarPausa.disabled = false; });
+    var botaoSalvar = document.createElement('button');
+    botaoSalvar.type = 'button';
+    botaoSalvar.textContent = 'Salvar horário';
+    form.appendChild(botaoSalvar);
+
+    var botaoCancelar = document.createElement('button');
+    botaoCancelar.className = 'secundario';
+    botaoCancelar.type = 'button';
+    botaoCancelar.textContent = 'Cancelar';
+    botaoCancelar.addEventListener('click', aoCancelar);
+    form.appendChild(botaoCancelar);
+
+    botaoSalvar.addEventListener('click', function () {
+      var shifts = [];
+      var invalido = false;
+      ORDEM_DIAS.forEach(function (dia) {
+        var linha = linhasPorDia[dia];
+        if (!linha.checkbox.checked) return;
+        if (!linha.inicio.value || !linha.fim.value) { invalido = true; return; }
+        shifts.push({
+          dayOfWeek: dia,
+          start: linha.inicio.value + ':00',
+          duration: calcularDuracaoMinutos(linha.inicio.value, linha.fim.value),
         });
-        cabecalho.appendChild(botaoCriarPausa);
-        secaoPausas.appendChild(cabecalho);
-
-        var pausas = null;
-        try { pausas = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
-
-        if (resultado.resposta.ok && Array.isArray(pausas)) {
-          if (pausas.length === 0) {
-            var semPausas = document.createElement('p');
-            semPausas.textContent = 'Nenhuma pausa cadastrada.';
-            secaoPausas.appendChild(semPausas);
-          } else {
-            secaoPausas.appendChild(criarListaPausasElemento(merchantId, pausas, recarregarPausas));
-          }
-        } else {
-          var erroPausas = document.createElement('p');
-          erroPausas.textContent = 'Não foi possível carregar as pausas.';
-          secaoPausas.appendChild(erroPausas);
-        }
       });
-    }
+      if (invalido) { alert('Preencha início e fim para todos os dias marcados.'); return; }
+      if (shifts.length === 0) { alert('Marque pelo menos um dia.'); return; }
 
-    function carregarHorario() {
-      chamarAcao('consultar-horario', { merchantId: merchantId }).then(function (resultado) {
-        secaoHorario.innerHTML = '';
-
-        var tituloHorario = document.createElement('div');
-        tituloHorario.className = 'secao-titulo';
-        tituloHorario.textContent = 'Horário de funcionamento';
-        secaoHorario.appendChild(tituloHorario);
-
-        var dados = null;
-        try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
-        if (resultado.resposta.ok && dados) {
-          secaoHorario.appendChild(renderizarHorarios(dados));
+      botaoSalvar.disabled = true;
+      chamarAcao('configurar-horario', { merchantId: merchantId }, { shifts: shifts }).then(function (resultado) {
+        adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['configurar-horario'], resultado.resposta.ok, resultado.corpo));
+        if (resultado.resposta.ok) {
+          aoConcluir();
         } else {
-          var erroHorario = document.createElement('p');
-          erroHorario.textContent = 'Não foi possível carregar o horário.';
-          secaoHorario.appendChild(erroHorario);
+          botaoSalvar.disabled = false;
         }
+      }).catch(function () { botaoSalvar.disabled = false; });
+    });
 
-        var botaoConfigurar = document.createElement('button');
-        botaoConfigurar.className = 'secundario';
-        botaoConfigurar.type = 'button';
-        botaoConfigurar.textContent = 'Configurar horário de funcionamento';
-        botaoConfigurar.addEventListener('click', function () {
-          botaoConfigurar.disabled = true;
-          chamarAcao('configurar-horario-teste', { merchantId: merchantId }).then(function (resConfig) {
-            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['configurar-horario-teste'], resConfig.resposta.ok, resConfig.corpo));
-            botaoConfigurar.disabled = false;
-            if (resConfig.resposta.ok) carregarHorario();
-          }).catch(function () { botaoConfigurar.disabled = false; });
-        });
-        secaoHorario.appendChild(botaoConfigurar);
-
-        var descricao = document.createElement('p');
-        descricao.className = 'descricao-acao';
-        descricao.textContent = 'Aplica: sábado 10h–19h; domingo 09h–12h, 13h–16h e 17h–23h.';
-        secaoHorario.appendChild(descricao);
-      });
-    }
-
-    recarregarPausas();
-    carregarHorario();
+    return form;
   }
 
+  function atualizarCartaoHorario() {
+    var conteudo = elemento('conteudo-horario');
+    conteudo.innerHTML = '';
+    if (!lojaSelecionada) {
+      conteudo.innerHTML = '<p class="resultado-vazio">Selecione uma loja na tabela acima.</p>';
+      return;
+    }
+    var merchantId = lojaSelecionada.merchantId;
+
+    var areaAtual = document.createElement('div');
+    areaAtual.innerHTML = '<p class="resultado-vazio">Carregando horário...</p>';
+    conteudo.appendChild(areaAtual);
+
+    var botaoAbrirForm = document.createElement('button');
+    botaoAbrirForm.className = 'secundario';
+    botaoAbrirForm.type = 'button';
+    botaoAbrirForm.textContent = 'Configurar horário de funcionamento';
+    conteudo.appendChild(botaoAbrirForm);
+
+    var areaForm = document.createElement('div');
+    conteudo.appendChild(areaForm);
+
+    var shiftsAtuais = [];
+
+    function carregarHorarioAtual() {
+      chamarAcao('consultar-horario', { merchantId: merchantId }).then(function (resultado) {
+        areaAtual.innerHTML = '';
+        var dados = null;
+        try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+        shiftsAtuais = extrairShifts(dados) || [];
+        if (resultado.resposta.ok && dados) {
+          areaAtual.appendChild(renderizarHorarios(dados));
+        } else {
+          areaAtual.innerHTML = '<p class="resultado-vazio">Não foi possível carregar o horário.</p>';
+        }
+      });
+    }
+
+    botaoAbrirForm.addEventListener('click', function () {
+      areaForm.innerHTML = '';
+      areaForm.appendChild(criarFormularioHorario(
+        merchantId,
+        shiftsAtuais,
+        function () { areaForm.innerHTML = ''; carregarHorarioAtual(); },
+        function () { areaForm.innerHTML = ''; },
+      ));
+    });
+
+    carregarHorarioAtual();
+  }
+
+  // --- Monitoramento: janelas (tabela monitoramento_janelas) ---
+
+  function carregarJanelas() {
+    var lista = elemento('lista-janelas');
+    lista.innerHTML = '<p class="resultado-vazio">Carregando janelas...</p>';
+    chamarAcao('listar-janelas', {}).then(function (resultado) {
+      lista.innerHTML = '';
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      if (!resultado.resposta.ok || !dados || !Array.isArray(dados.janelas)) {
+        lista.innerHTML = '<p class="resultado-vazio">Não foi possível carregar as janelas.</p>';
+        return;
+      }
+      if (dados.janelas.length === 0) {
+        lista.innerHTML = '<p class="resultado-vazio">Nenhuma janela cadastrada — o monitoramento automático não vai rodar até você adicionar uma.</p>';
+        return;
+      }
+      dados.janelas.forEach(function (janela) {
+        var item = document.createElement('div');
+        item.className = 'janela-item';
+
+        var info = document.createElement('div');
+        var titulo = document.createElement('div');
+        titulo.className = 'pausa-descricao';
+        titulo.textContent = janela.descricao;
+        info.appendChild(titulo);
+        var periodo = document.createElement('div');
+        periodo.className = 'pausa-periodo';
+        periodo.textContent = janela.hora_inicio.slice(0, 5) + ' – ' + janela.hora_fim.slice(0, 5)
+          + ' · ' + formatarDiasSemana(janela.dias_semana);
+        info.appendChild(periodo);
+        item.appendChild(info);
+
+        var botaoRemover = document.createElement('button');
+        botaoRemover.className = 'perigo';
+        botaoRemover.type = 'button';
+        botaoRemover.textContent = 'Remover';
+        botaoRemover.addEventListener('click', function () {
+          botaoRemover.disabled = true;
+          chamarAcao('remover-janela', { id: janela.id }).then(function (resultadoRemover) {
+            adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['remover-janela'], resultadoRemover.resposta.ok, resultadoRemover.corpo));
+            carregarJanelas();
+          }).catch(function () { botaoRemover.disabled = false; });
+        });
+        item.appendChild(botaoRemover);
+
+        lista.appendChild(item);
+      });
+    });
+  }
+
+  elemento('botao-criar-janela').addEventListener('click', function () {
+    var descricao = elemento('campo-janela-descricao').value.trim() || 'Janela de monitoramento';
+    var horaInicio = elemento('campo-janela-inicio').value;
+    var horaFim = elemento('campo-janela-fim').value;
+    if (!horaInicio || !horaFim) return;
+
+    var botao = elemento('botao-criar-janela');
+    botao.disabled = true;
+    chamarAcao('criar-janela', { descricao: descricao, horaInicio: horaInicio, horaFim: horaFim }).then(function (resultado) {
+      adicionarResultado(criarCartaoResultado(ROTULOS_ACAO['criar-janela'], resultado.resposta.ok, resultado.corpo));
+      botao.disabled = false;
+      if (resultado.resposta.ok) {
+        elemento('campo-janela-descricao').value = '';
+        elemento('campo-janela-inicio').value = '';
+        elemento('campo-janela-fim').value = '';
+        carregarJanelas();
+      }
+    }).catch(function () { botao.disabled = false; });
+  });
+
   // --- Tabela da aba Painel: lojas ativas na monitoração + status ---
+
+  function selecionarLoja(merchantId, nome) {
+    lojaSelecionada = { merchantId: merchantId, nome: nome };
+    atualizarCartaoPausas();
+    atualizarCartaoHorario();
+  }
 
   function carregarTabelaLojas() {
     var corpo = elemento('corpo-tabela-lojas');
     corpo.innerHTML = '';
     elemento('tabela-lojas-vazia').style.display = 'none';
-    elemento('detalhe-loja').style.display = 'none';
-    elemento('detalhe-loja').innerHTML = '';
+    lojaSelecionada = null;
+    atualizarCartaoPausas();
+    atualizarCartaoHorario();
 
     chamarAcao('listar-lojas-cadastradas', {}).then(function (resultado) {
       var dados = null;
@@ -593,7 +862,7 @@
           var selecionadas = document.querySelectorAll('.linha-loja.selecionada');
           for (var s = 0; s < selecionadas.length; s++) selecionadas[s].classList.remove('selecionada');
           linha.classList.add('selecionada');
-          mostrarDetalheLoja(loja.merchant_id, loja.nome);
+          selecionarLoja(loja.merchant_id, loja.nome);
         });
 
         corpo.appendChild(linha);
@@ -743,7 +1012,7 @@
     mostrarLogin(mensagem);
   }
 
-  function chamarAcaoUmaVez(acao, params) {
+  function chamarAcaoUmaVez(acao, params, corpoJson) {
     var accessToken = localStorage.getItem(CHAVE_ACCESS);
     var query = FUNCTION_URL + '?acao=' + encodeURIComponent(acao);
     for (var chave in params) {
@@ -751,21 +1020,25 @@
         query += '&' + encodeURIComponent(chave) + '=' + encodeURIComponent(params[chave]);
       }
     }
-    return fetch(query, { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken } })
-      .then(function (resposta) {
-        return resposta.text().then(function (corpo) {
-          return { resposta: resposta, corpo: corpo, query: query };
-        });
+    var opcoes = { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken } };
+    if (corpoJson) {
+      opcoes.headers['Content-Type'] = 'application/json';
+      opcoes.body = JSON.stringify(corpoJson);
+    }
+    return fetch(query, opcoes).then(function (resposta) {
+      return resposta.text().then(function (corpo) {
+        return { resposta: resposta, corpo: corpo, query: query };
       });
+    });
   }
 
   // Chama a ação; se der 401 (token expirado), tenta renovar a sessão uma
   // vez e repete a chamada antes de desistir e voltar pro login.
-  function chamarAcao(acao, params) {
-    return chamarAcaoUmaVez(acao, params).then(function (resultado) {
+  function chamarAcao(acao, params, corpoJson) {
+    return chamarAcaoUmaVez(acao, params, corpoJson).then(function (resultado) {
       if (resultado.resposta.status === 401) {
         return renovarSessao().then(function () {
-          return chamarAcaoUmaVez(acao, params);
+          return chamarAcaoUmaVez(acao, params, corpoJson);
         }).catch(function () {
           encerrarSessao('Sessão expirada. Entre de novo.');
           throw new Error('Sessão expirada.');
