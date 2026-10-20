@@ -173,6 +173,8 @@
         <p id="tabela-lojas-vazia" class="resultado-vazio" style="display:none;">
           Nenhuma loja cadastrada para monitoração. Adicione na aba "Lojas".
         </p>
+        <button id="botao-ver-detalhes-loja" class="secundario" type="button">Ver detalhes completos</button>
+        <div id="conteudo-detalhes-loja"></div>
       </div>
 
       <div class="cartao">
@@ -861,9 +863,27 @@
 
   function selecionarLoja(merchantId, nome) {
     lojaSelecionada = { merchantId: merchantId, nome: nome };
+    elemento('conteudo-detalhes-loja').innerHTML = '';
     atualizarCartaoPausas();
     atualizarCartaoHorario();
   }
+
+  elemento('botao-ver-detalhes-loja').addEventListener('click', function () {
+    var area = elemento('conteudo-detalhes-loja');
+    if (area.innerHTML) { area.innerHTML = ''; return; }
+    if (!lojaSelecionada) { mostrarAviso('Selecione uma loja na tabela primeiro.', false); return; }
+    area.innerHTML = '<p class="resultado-vazio">Carregando detalhes...</p>';
+    chamarAcao('detalhes-loja', { merchantId: lojaSelecionada.merchantId }).then(function (resultado) {
+      area.innerHTML = '';
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      if (resultado.resposta.ok && dados) {
+        area.appendChild(renderizarValor(dados));
+      } else {
+        area.innerHTML = '<p class="resultado-vazio">Não foi possível carregar os detalhes.</p>';
+      }
+    });
+  });
 
   function carregarTabelaLojas() {
     var corpo = elemento('corpo-tabela-lojas');
