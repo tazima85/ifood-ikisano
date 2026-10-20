@@ -84,8 +84,8 @@
     <div class="cartao">
       <label for="campo-merchant-id">Merchant ID</label>
       <input id="campo-merchant-id" type="text" placeholder="id da loja (fica salvo só neste navegador)" />
-      <label for="campo-interruption-id">Interruption ID (só para remover pausa)</label>
-      <input id="campo-interruption-id" type="text" placeholder="id retornado por 'Criar pausa de teste' ou 'Listar pausas'" />
+      <label for="campo-interruption-id">Interruption ID (opcional pra remover pausa)</label>
+      <input id="campo-interruption-id" type="text" placeholder="deixe em branco para buscar automaticamente (só funciona se houver 1 pausa ativa)" />
 
       <div class="secao-titulo">Loja</div>
       <button data-acao="listar-lojas" type="button">Listar lojas</button>
@@ -252,6 +252,29 @@
     encerrarSessao();
   });
 
+  // Se "Remover pausa" for clicado sem Interruption ID preenchido, busca a
+  // lista de pausas da loja primeiro: se houver exatamente uma, usa o id
+  // dela direto; se houver mais de uma, pede pra escolher manualmente (a
+  // API do iFood exige um id específico — não dá pra remover "a pausa" sem
+  // dizer qual, quando existe mais de uma).
+  function resolverInterruptionId(merchantId) {
+    return chamarAcao('listar-pausas', { merchantId: merchantId }).then(function (resultado) {
+      var pausas;
+      try { pausas = JSON.parse(resultado.corpo); }
+      catch (e) { pausas = []; }
+      if (!Array.isArray(pausas) || pausas.length === 0) {
+        throw new Error('Nenhuma pausa encontrada pra essa loja.');
+      }
+      if (pausas.length > 1) {
+        throw new Error(
+          'Mais de uma pausa encontrada (' + pausas.length + ') — veja a lista acima no ' +
+          'resultado e cole o id da pausa certa no campo Interruption ID.',
+        );
+      }
+      return pausas[0].id;
+    });
+  }
+
   var botoesAcao = document.querySelectorAll('[data-acao]');
   for (var i = 0; i < botoesAcao.length; i++) {
     botoesAcao[i].addEventListener('click', function (evento) {
@@ -264,13 +287,27 @@
           localStorage.setItem(CHAVE_MERCHANT_ID, params.merchantId);
         }
       }
-      if (botao.getAttribute('data-usa-interruption')) {
-        params.interruptionId = elemento('campo-interruption-id').value.trim();
-      }
       if (botao.getAttribute('data-ignorar-janela')) {
         params.ignorarJanela = 'true';
       }
-      chamarAcao(acao, params);
+
+      if (botao.getAttribute('data-usa-interruption')) {
+        var interruptionId = elemento('campo-interruption-id').value.trim();
+        if (interruptionId) {
+          params.interruptionId = interruptionId;
+          chamarAcao(acao, params);
+        } else {
+          resolverInterruptionId(params.merchantId).then(function (idEncontrado) {
+            elemento('campo-interruption-id').value = idEncontrado;
+            params.interruptionId = idEncontrado;
+            return chamarAcao(acao, params);
+          }).catch(function (erro) {
+            registrarSaida(acao, '(resolução automática do Interruption ID)', '-', erro.message);
+          });
+        }
+      } else {
+        chamarAcao(acao, params);
+      }
     });
   }
 
