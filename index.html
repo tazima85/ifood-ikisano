@@ -115,12 +115,13 @@
   </div>
 
 <script>
-  // Configuração do projeto Supabase "Reports Boali". A anon key NÃO é um
-  // segredo — é a chave pública feita pra ficar embutida em front-ends, só
+  // Configuração do projeto Supabase "Reports Boali". A publishable key NÃO
+  // é um segredo — é a chave feita pra ficar embutida em front-ends (o
+  // próprio Supabase diz "pode ser compartilhada publicamente"), só
   // identifica o projeto; quem autentica de verdade é o login (email/senha)
   // via Supabase Auth, validado pela Edge Function a cada chamada.
   var SUPABASE_URL = 'https://fwwebebfagezdqsbybjy.supabase.co';
-  var SUPABASE_ANON_KEY = 'COLOQUE_A_ANON_KEY_AQUI';
+  var SUPABASE_ANON_KEY = 'sb_publishable_uHBXCII9DPlN5tZjQ2i-8A_H4SJur38';
   var FUNCTION_URL = SUPABASE_URL + '/functions/v1/ifood-pausas';
 
   var CHAVE_ACCESS = 'ifoodPainelAccessToken';
