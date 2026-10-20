@@ -302,13 +302,14 @@
     if (!iso) return '—';
     var data = new Date(iso);
     if (isNaN(data.getTime())) return iso;
-    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-    // "start"/"end" chegam da iFood como os dígitos locais da loja com
-    // sufixo "Z" (a API não converte fuso de verdade — ver
-    // criarFormularioPausa). Por isso lemos os componentes em UTC aqui: são
-    // exatamente os dígitos originais, sem nenhuma conversão de fuso.
-    return pad(data.getUTCDate()) + '/' + pad(data.getUTCMonth() + 1) + '/' + data.getUTCFullYear()
-      + ' ' + pad(data.getUTCHours()) + ':' + pad(data.getUTCMinutes());
+    // A iFood é inconsistente entre escrita e leitura: ao CRIAR uma pausa
+    // (POST /interruptions) ela usa os dígitos como horário local da loja,
+    // sem converter fuso (ver criarFormularioPausa) — mas ao LISTAR (GET)
+    // ela devolve "start"/"end" como instante UTC de verdade, já convertido
+    // corretamente (confirmado comparando com o Portal do Parceiro). Por
+    // isso aqui, na exibição, a conversão para America/Sao_Paulo é
+    // necessária de novo.
+    return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   }
 
   function somarMinutos(horaStr, minutos) {
