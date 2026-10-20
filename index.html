@@ -302,7 +302,9 @@
     if (!iso) return '—';
     var data = new Date(iso);
     if (isNaN(data.getTime())) return iso;
-    return data.toLocaleString('pt-BR');
+    // Fixo em America/Sao_Paulo, independente do fuso do dispositivo de
+    // quem está vendo o painel.
+    return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   }
 
   function somarMinutos(horaStr, minutos) {
@@ -457,8 +459,12 @@
 
     botaoSalvar.addEventListener('click', function () {
       if (!campoInicio.value || !campoFim.value) return;
-      var inicioIso = new Date(campoInicio.value).toISOString();
-      var fimIso = new Date(campoFim.value).toISOString();
+      // O <input type="datetime-local"> não carrega fuso horário — o valor
+      // digitado é sempre tratado como horário de Brasília (America/Sao_Paulo,
+      // sem horário de verão desde 2019), não o fuso do navegador/dispositivo
+      // de quem está usando o painel.
+      var inicioIso = new Date(campoInicio.value + ':00-03:00').toISOString();
+      var fimIso = new Date(campoFim.value + ':00-03:00').toISOString();
       botaoSalvar.disabled = true;
       chamarAcao('criar-pausa', {
         merchantId: merchantId,
