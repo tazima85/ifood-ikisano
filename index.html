@@ -660,7 +660,7 @@
 
     botaoSalvar.addEventListener('click', function () {
       var shifts = [];
-      var invalido = false;
+      var mensagensInvalidas = [];
       ORDEM_DIAS.forEach(function (dia) {
         var linhas = turnosPorDia[dia].querySelectorAll('.turno-linha');
         for (var i = 0; i < linhas.length; i++) {
@@ -668,11 +668,22 @@
           var inicio = linha.inicioInput.value;
           var fim = linha.fimInput.value;
           if (!inicio && !fim) continue; // linha vazia, ignora
-          if (!inicio || !fim) { invalido = true; continue; }
+          if (!inicio || !fim) {
+            mensagensInvalidas.push(DIAS_PT[dia] + ': preencha início e fim do turno.');
+            continue;
+          }
+          if (inicio === fim) {
+            // Início igual ao fim é ambíguo (o cálculo abaixo trataria como
+            // 24h, o que normalmente sobrepõe o turno seguinte e a iFood
+            // rejeita com "InvalidOpeningHours") — barrar aqui antes de
+            // chamar a API, com uma mensagem que já diz qual dia corrigir.
+            mensagensInvalidas.push(DIAS_PT[dia] + ': início e fim do turno não podem ser iguais.');
+            continue;
+          }
           shifts.push({ dayOfWeek: dia, start: inicio + ':00', duration: calcularDuracaoMinutos(inicio, fim) });
         }
       });
-      if (invalido) { mostrarAviso('Preencha início e fim de cada turno (ou remova a linha).', false); return; }
+      if (mensagensInvalidas.length > 0) { mostrarAviso(mensagensInvalidas.join(' '), false); return; }
       if (shifts.length === 0) { mostrarAviso('Adicione pelo menos um turno.', false); return; }
 
       botaoSalvar.disabled = true;
