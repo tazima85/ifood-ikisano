@@ -951,13 +951,20 @@
         chamarAcao('consultar-status', { merchantId: loja.merchant_id }).then(function (resultadoStatus) {
           var itens = null;
           try { itens = JSON.parse(resultadoStatus.corpo); } catch (e) { /* segue nulo */ }
-          var estado = null;
+          // Padroniza para "Aberta"/"Fechada": a API da iFood devolve um
+          // "state" com vários códigos técnicos (OK, WARNING, CLOSED, ERROR,
+          // UNAVAILABLE), mas também devolve "available" (true/false), que já
+          // diz diretamente se a loja está pronta para receber pedidos — é
+          // esse campo que define o rótulo exibido.
+          var aberta = null;
           if (resultadoStatus.resposta.ok && Array.isArray(itens)) {
             var principal = itens.filter(function (i) { return i.operation === 'DELIVERY'; })[0] || itens[0];
-            estado = principal ? principal.state : null;
+            if (principal) {
+              aberta = typeof principal.available === 'boolean' ? principal.available : (principal.state === 'OK');
+            }
           }
-          seloStatus.className = 'status-badge ' + (estado === 'OK' ? 'status-ok' : 'status-alerta');
-          seloStatus.textContent = estado || 'Indisponível';
+          seloStatus.className = 'status-badge ' + (aberta === null ? 'status-neutro' : (aberta ? 'status-ok' : 'status-alerta'));
+          seloStatus.textContent = aberta === null ? 'Indisponível' : (aberta ? 'Aberta' : 'Fechada');
         });
       });
 
