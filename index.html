@@ -193,6 +193,10 @@
 
       <div class="cartao">
         <div class="secao-titulo">Monitoramento</div>
+        <div id="status-monitoramento" class="resultado-cabecalho">
+          <span id="texto-status-monitoramento" class="resultado-vazio">Carregando status...</span>
+          <button id="botao-alternar-monitoramento" class="secundario" type="button" disabled>...</button>
+        </div>
         <div id="lista-janelas"></div>
         <button id="botao-abrir-form-janela" class="secundario" type="button">Adicionar janela</button>
         <div id="area-form-janela"></div>
@@ -249,6 +253,8 @@
     'criar-janela': 'Adicionar janela',
     'remover-janela': 'Remover janela',
     'monitorar': 'Monitorar agora',
+    'consultar-monitoramento': 'Consultar status do monitoramento',
+    'definir-monitoramento': 'Alternar monitoramento',
   };
 
   var DIAS_PT = {
@@ -266,6 +272,7 @@
     elemento('tela-login').style.display = 'none';
     elemento('painel').style.display = 'block';
     carregarTabelaLojas();
+    carregarStatusMonitoramento();
     carregarJanelas();
   }
 
@@ -748,7 +755,41 @@
     });
   }
 
-  // --- Monitoramento: janelas (tabela monitoramento_janelas) ---
+  // --- Monitoramento: chave geral (pausado) + janelas (monitoramento_janelas) ---
+
+  function carregarStatusMonitoramento() {
+    var texto = elemento('texto-status-monitoramento');
+    var botao = elemento('botao-alternar-monitoramento');
+    texto.textContent = 'Carregando status...';
+    botao.disabled = true;
+
+    chamarAcao('consultar-monitoramento', {}).then(function (resultado) {
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      if (!resultado.resposta.ok || !dados) {
+        texto.textContent = 'Não foi possível consultar o status do monitoramento.';
+        return;
+      }
+      var pausado = !!dados.pausado;
+      texto.textContent = pausado
+        ? 'Monitoramento automático: pausado.'
+        : 'Monitoramento automático: ativo (a cada ' + dados.intervalo_minutos + ' min, nas janelas cadastradas).';
+      botao.textContent = pausado ? 'Retomar monitoramento' : 'Pausar monitoramento';
+      botao.className = pausado ? '' : 'perigo';
+      botao.disabled = false;
+      botao.onclick = function () {
+        botao.disabled = true;
+        chamarAcao('definir-monitoramento', { pausado: pausado ? 'false' : 'true' }).then(function (resultadoDef) {
+          if (resultadoDef.resposta.ok) {
+            mostrarAviso(pausado ? 'Monitoramento retomado.' : 'Monitoramento pausado.', true);
+          } else {
+            mostrarAviso('Alternar monitoramento: ' + extrairMensagemErro(resultadoDef.corpo), false);
+          }
+          carregarStatusMonitoramento();
+        }).catch(function () { botao.disabled = false; });
+      };
+    });
+  }
 
   function carregarJanelas() {
     var lista = elemento('lista-janelas');
