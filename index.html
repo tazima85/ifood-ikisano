@@ -309,16 +309,16 @@
 
   function formatarDataHora(iso) {
     if (!iso) return '—';
-    var data = new Date(iso);
-    if (isNaN(data.getTime())) return iso;
-    // A iFood é inconsistente entre escrita e leitura: ao CRIAR uma pausa
-    // (POST /interruptions) ela usa os dígitos como horário local da loja,
-    // sem converter fuso (ver criarFormularioPausa) — mas ao LISTAR (GET)
-    // ela devolve "start"/"end" como instante UTC de verdade, já convertido
-    // corretamente (confirmado comparando com o Portal do Parceiro). Por
-    // isso aqui, na exibição, a conversão para America/Sao_Paulo é
-    // necessária de novo.
-    return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    // A API do iFood devolve "start"/"end" sem offset de fuso confiável (às
+    // vezes sem nada, às vezes com "Z" que não significa UTC de verdade) —
+    // os dígitos já são o horário local da loja, igual ao que acontece ao
+    // CRIAR uma pausa (ver criarFormularioPausa). Confirmado com um caso
+    // real: a API devolveu "...T11:31:20" para uma pausa das 11:31 (hora
+    // local), e converter isso como UTC→America/Sao_Paulo mostrava 08:31.
+    // Por isso aqui só formatamos os dígitos como vieram, sem conversão.
+    var m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return iso;
+    return m[3] + '/' + m[2] + '/' + m[1] + ' ' + m[4] + ':' + m[5];
   }
 
   function somarMinutos(horaStr, minutos) {
