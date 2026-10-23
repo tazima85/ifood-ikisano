@@ -25,13 +25,19 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
   label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; margin-top: 10px; }
-  input {
+  input, select {
     width: 100%;
     padding: 10px;
     font-size: 1rem;
     border: 1px solid #d0d0d5;
     border-radius: 8px;
+    background: #fff;
+    font-family: inherit;
   }
+  .resumo-kpis { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+  .resumo-kpis .item { flex: 1 1 120px; background: #faf7f5; border-radius: 8px; padding: 8px 10px; }
+  .resumo-kpis .item .rotulo { font-size: 0.7rem; color: #888; text-transform: uppercase; }
+  .resumo-kpis .item .valor { font-size: 1.1rem; font-weight: 700; }
   button {
     display: inline-block;
     margin: 4px 4px 0 0;
@@ -161,6 +167,7 @@
     <div class="abas">
       <button class="aba-botao ativa" data-aba="dashboard" type="button">Painel</button>
       <button class="aba-botao" data-aba="lojas" type="button">Lojas</button>
+      <button class="aba-botao" data-aba="analytics" type="button">Analytics</button>
     </div>
 
     <div id="aba-dashboard" class="aba-conteudo">
@@ -222,6 +229,24 @@
         </table>
       </div>
     </div>
+
+    <div id="aba-analytics" class="aba-conteudo" style="display:none;">
+      <div class="cartao">
+        <div class="secao-titulo">Consultar KPIs</div>
+        <p class="resultado-vazio">
+          Dados históricos (D-1): o iFood publica os pedidos de um dia até às 9h do dia
+          seguinte. Por padrão, o período abaixo já vem com o dia de ontem selecionado.
+        </p>
+        <label for="campo-analytics-loja">Loja</label>
+        <select id="campo-analytics-loja"></select>
+        <label for="campo-analytics-data-inicio">De</label>
+        <input id="campo-analytics-data-inicio" type="date" />
+        <label for="campo-analytics-data-fim">Até</label>
+        <input id="campo-analytics-data-fim" type="date" />
+        <button id="botao-consultar-kpis" type="button">Consultar KPIs</button>
+        <div id="conteudo-analytics"></div>
+      </div>
+    </div>
   </div>
 
   <div id="aviso"></div>
@@ -235,6 +260,7 @@
   var SUPABASE_URL = 'https://fwwebebfagezdqsbybjy.supabase.co';
   var SUPABASE_ANON_KEY = 'sb_publishable_uHBXCII9DPlN5tZjQ2i-8A_H4SJur38';
   var FUNCTION_URL = SUPABASE_URL + '/functions/v1/ifood-pausas';
+  var ANALYTICS_FUNCTION_URL = SUPABASE_URL + '/functions/v1/ifood-analytics';
 
   var CHAVE_ACCESS = 'ifoodPainelAccessToken';
   var CHAVE_REFRESH = 'ifoodPainelRefreshToken';
@@ -1093,6 +1119,148 @@
     }).catch(function () { botao.disabled = false; });
   });
 
+  // --- Aba Analytics: KPIs agregados (módulo Analytics/BI, ifood-analytics) ---
+
+  // Data de "ontem" no fuso America/Sao_Paulo, em "YYYY-MM-DD" — mesmo
+  // critério usado pelo backend (dados do iFood são D-1).
+  function ontemEmSaoPauloISO() {
+    var hojeStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    var ontem = new Date(hojeStr + 'T00:00:00-03:00');
+    ontem.setDate(ontem.getDate() - 1);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(ontem);
+  }
+
+  function carregarSelectLojasAnalytics() {
+    var select = elemento('campo-analytics-loja');
+    return chamarAcao('listar-lojas-cadastradas', {}).then(function (resultado) {
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      select.innerHTML = '';
+      if (!resultado.resposta.ok || !dados || !Array.isArray(dados.lojas)) return;
+      dados.lojas.filter(function (loja) { return loja.ativo; }).forEach(function (loja) {
+        var opcao = document.createElement('option');
+        opcao.value = loja.merchant_id;
+        opcao.textContent = loja.nome;
+        select.appendChild(opcao);
+      });
+    });
+  }
+
+  function inicializarAbaAnalytics() {
+    if (!elemento('campo-analytics-data-inicio').value) {
+      var ontemStr = ontemEmSaoPauloISO();
+      elemento('campo-analytics-data-inicio').value = ontemStr;
+      elemento('campo-analytics-data-fim').value = ontemStr;
+    }
+    carregarSelectLojasAnalytics();
+  }
+
+  // Extrai um resumo amigável do formato de resposta de /orders/kpis
+  // (contagens em data[0].<campo>.value, métricas em data[0].<campo>.sum) —
+  // com checagens defensivas, já que o formato exato só pôde ser confirmado
+  // de fato durante a homologação (Fase 4 do projeto).
+  function extrairResumoKpis(resultadoJson) {
+    var linha = (resultadoJson && resultadoJson.resultado && Array.isArray(resultadoJson.resultado.data))
+      ? resultadoJson.resultado.data[0]
+      : null;
+    if (!linha) return null;
+
+    var statusValores = (linha.orderStatus && linha.orderStatus.value) || {};
+    var totalPedidos = Object.keys(statusValores).reduce(function (soma, chave) {
+      return soma + (statusValores[chave] || 0);
+    }, 0);
+    var concluidos = statusValores.CONCLUDED || 0;
+    var cancelados = statusValores.CANCELLED || 0;
+    var taxaCancelamento = totalPedidos > 0 ? (cancelados / totalPedidos) * 100 : null;
+
+    var gmvTotal = (linha.gmv && (linha.gmv.sum != null ? linha.gmv.sum : linha.gmv.value));
+    if (gmvTotal === undefined) gmvTotal = null;
+    var baseTicket = concluidos > 0 ? concluidos : totalPedidos;
+    var ticketMedio = (gmvTotal != null && baseTicket > 0) ? gmvTotal / baseTicket : null;
+
+    return {
+      totalPedidos: totalPedidos,
+      concluidos: concluidos,
+      cancelados: cancelados,
+      taxaCancelamento: taxaCancelamento,
+      gmvTotal: gmvTotal,
+      ticketMedio: ticketMedio,
+      linhaCompleta: linha,
+    };
+  }
+
+  function formatarReais(valor) {
+    if (valor === null || valor === undefined) return '—';
+    return 'R$ ' + valor.toFixed(2).replace('.', ',');
+  }
+
+  function formatarPercentual(valor) {
+    if (valor === null || valor === undefined) return '—';
+    return valor.toFixed(1).replace('.', ',') + '%';
+  }
+
+  elemento('botao-consultar-kpis').addEventListener('click', function () {
+    var merchantId = elemento('campo-analytics-loja').value;
+    var dataInicio = elemento('campo-analytics-data-inicio').value;
+    var dataFim = elemento('campo-analytics-data-fim').value;
+    var area = elemento('conteudo-analytics');
+
+    if (!merchantId) { mostrarAviso('Selecione uma loja.', false); return; }
+    if (!dataInicio || !dataFim) { mostrarAviso('Selecione o período.', false); return; }
+
+    area.innerHTML = '<p class="resultado-vazio">Consultando...</p>';
+    chamarAcao('kpis', { merchantId: merchantId, dataInicio: dataInicio, dataFim: dataFim }, null, ANALYTICS_FUNCTION_URL)
+      .then(function (resultado) {
+        if (!resultado.resposta.ok) {
+          area.innerHTML = '<p class="resultado-vazio">Não foi possível consultar os KPIs.</p>';
+          mostrarAviso('Consultar KPIs: ' + extrairMensagemErro(resultado.corpo), false);
+          return;
+        }
+
+        var dadosResposta = null;
+        try { dadosResposta = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+        var resumo = dadosResposta ? extrairResumoKpis(dadosResposta) : null;
+
+        area.innerHTML = '';
+        if (!resumo || resumo.totalPedidos === 0) {
+          area.innerHTML = '<p class="resultado-vazio">Sem pedidos no período selecionado.</p>';
+          return;
+        }
+
+        var painelResumo = document.createElement('div');
+        painelResumo.className = 'resumo-kpis';
+        [
+          ['GMV total', formatarReais(resumo.gmvTotal)],
+          ['Ticket médio', formatarReais(resumo.ticketMedio)],
+          ['Pedidos concluídos', String(resumo.concluidos)],
+          ['Pedidos cancelados', String(resumo.cancelados)],
+          ['Taxa de cancelamento', formatarPercentual(resumo.taxaCancelamento)],
+        ].forEach(function (par) {
+          var item = document.createElement('div');
+          item.className = 'item';
+          var rotulo = document.createElement('div');
+          rotulo.className = 'rotulo';
+          rotulo.textContent = par[0];
+          var valor = document.createElement('div');
+          valor.className = 'valor';
+          valor.textContent = par[1];
+          item.appendChild(rotulo);
+          item.appendChild(valor);
+          painelResumo.appendChild(item);
+        });
+        area.appendChild(painelResumo);
+
+        var detalheTitulo = document.createElement('div');
+        detalheTitulo.className = 'secao-titulo';
+        detalheTitulo.textContent = 'Distribuição detalhada (canal, pagamento, logística)';
+        area.appendChild(detalheTitulo);
+        area.appendChild(renderizarValor(resumo.linhaCompleta));
+      })
+      .catch(function () {
+        area.innerHTML = '<p class="resultado-vazio">Não foi possível consultar os KPIs.</p>';
+      });
+  });
+
   // --- Abas ---
 
   var botoesAba = document.querySelectorAll('.aba-botao');
@@ -1108,6 +1276,7 @@
       elemento('aba-' + alvo).style.display = 'block';
 
       if (alvo === 'lojas') carregarGestaoLojas();
+      if (alvo === 'analytics') inicializarAbaAnalytics();
     });
   }
 
@@ -1153,9 +1322,9 @@
     mostrarLogin(mensagem);
   }
 
-  function chamarAcaoUmaVez(acao, params, corpoJson) {
+  function chamarAcaoUmaVez(acao, params, corpoJson, baseUrl) {
     var accessToken = localStorage.getItem(CHAVE_ACCESS);
-    var query = FUNCTION_URL + '?acao=' + encodeURIComponent(acao);
+    var query = (baseUrl || FUNCTION_URL) + '?acao=' + encodeURIComponent(acao);
     for (var chave in params) {
       if (params[chave]) {
         query += '&' + encodeURIComponent(chave) + '=' + encodeURIComponent(params[chave]);
@@ -1174,12 +1343,15 @@
   }
 
   // Chama a ação; se der 401 (token expirado), tenta renovar a sessão uma
-  // vez e repete a chamada antes de desistir e voltar pro login.
-  function chamarAcao(acao, params, corpoJson) {
-    return chamarAcaoUmaVez(acao, params, corpoJson).then(function (resultado) {
+  // vez e repete a chamada antes de desistir e voltar pro login. "baseUrl"
+  // permite reaproveitar a mesma sessão (login único) pra chamar outra
+  // Edge Function do projeto (ex.: ifood-analytics), já que a autenticação é
+  // por projeto Supabase, não por function.
+  function chamarAcao(acao, params, corpoJson, baseUrl) {
+    return chamarAcaoUmaVez(acao, params, corpoJson, baseUrl).then(function (resultado) {
       if (resultado.resposta.status === 401) {
         return renovarSessao().then(function () {
-          return chamarAcaoUmaVez(acao, params, corpoJson);
+          return chamarAcaoUmaVez(acao, params, corpoJson, baseUrl);
         }).catch(function () {
           encerrarSessao('Sessão expirada. Entre de novo.');
           throw new Error('Sessão expirada.');
