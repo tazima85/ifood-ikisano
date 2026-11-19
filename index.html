@@ -82,6 +82,8 @@
   .status-badge.status-alerta { background: #fbe7e4; color: #c0392b; }
   .status-badge.status-neutro { background: #eee; color: #777; }
 
+  tr.linha-alerta td { background: #fbe7e4; color: #c0392b; font-weight: 600; }
+
   .resultado-vazio { color: #888; font-size: 0.85rem; margin: 0; }
   .resultado-cabecalho {
     display: flex;
@@ -168,6 +170,7 @@
       <button class="aba-botao ativa" data-aba="dashboard" type="button">Painel</button>
       <button class="aba-botao" data-aba="lojas" type="button">Lojas</button>
       <button class="aba-botao" data-aba="analytics" type="button">Analytics</button>
+      <button class="aba-botao" data-aba="cardapio" type="button">Cardápio</button>
     </div>
 
     <div id="aba-dashboard" class="aba-conteudo">
@@ -247,6 +250,24 @@
         <div id="conteudo-analytics"></div>
       </div>
     </div>
+
+    <div id="aba-cardapio" class="aba-conteudo" style="display:none;">
+      <div class="cartao">
+        <div class="secao-titulo">Produtos pausados por loja</div>
+        <p class="resultado-vazio">
+          Checado automaticamente nos horários de pico (mesmas janelas da aba
+          "Painel"). Linhas destacadas em vermelho estão com mais de 25% dos
+          produtos pausados — já dispararam alerta por WhatsApp.
+        </p>
+        <table>
+          <thead><tr><th>Loja</th><th>Total produtos</th><th>Pausados</th><th>% pausados</th></tr></thead>
+          <tbody id="corpo-tabela-cardapio"></tbody>
+        </table>
+        <p id="tabela-cardapio-vazia" class="resultado-vazio" style="display:none;">
+          Ainda não há checagens registradas.
+        </p>
+      </div>
+    </div>
   </div>
 
   <div id="aviso"></div>
@@ -281,6 +302,7 @@
     'monitorar': 'Monitorar agora',
     'consultar-monitoramento': 'Consultar status do monitoramento',
     'definir-monitoramento': 'Alternar monitoramento',
+    'listar-cardapio': 'Listar cardápio',
   };
 
   var DIAS_PT = {
@@ -1261,6 +1283,52 @@
       });
   });
 
+  // --- Aba Cardápio: % de produtos pausados por loja (checagem automática) ---
+
+  function carregarCardapio() {
+    var corpo = elemento('corpo-tabela-cardapio');
+    var vazio = elemento('tabela-cardapio-vazia');
+    corpo.innerHTML = '';
+    vazio.style.display = 'none';
+
+    chamarAcao('listar-cardapio', {}).then(function (resultado) {
+      var dados = null;
+      try { dados = JSON.parse(resultado.corpo); } catch (e) { /* segue nulo */ }
+      if (!resultado.resposta.ok || !dados || !Array.isArray(dados.lojas)) {
+        mostrarAviso('Listar cardápio: ' + extrairMensagemErro(resultado.corpo), false);
+        vazio.style.display = 'block';
+        return;
+      }
+      if (dados.lojas.length === 0) {
+        vazio.style.display = 'block';
+        return;
+      }
+
+      dados.lojas.forEach(function (loja) {
+        var linha = document.createElement('tr');
+        if (loja.percentual_pausados > 25) linha.className = 'linha-alerta';
+
+        var celulaNome = document.createElement('td');
+        celulaNome.textContent = loja.loja_nome;
+        linha.appendChild(celulaNome);
+
+        var celulaTotal = document.createElement('td');
+        celulaTotal.textContent = loja.total_produtos;
+        linha.appendChild(celulaTotal);
+
+        var celulaPausados = document.createElement('td');
+        celulaPausados.textContent = loja.produtos_pausados;
+        linha.appendChild(celulaPausados);
+
+        var celulaPercentual = document.createElement('td');
+        celulaPercentual.textContent = formatarPercentual(loja.percentual_pausados);
+        linha.appendChild(celulaPercentual);
+
+        corpo.appendChild(linha);
+      });
+    });
+  }
+
   // --- Abas ---
 
   var botoesAba = document.querySelectorAll('.aba-botao');
@@ -1277,6 +1345,7 @@
 
       if (alvo === 'lojas') carregarGestaoLojas();
       if (alvo === 'analytics') inicializarAbaAnalytics();
+      if (alvo === 'cardapio') carregarCardapio();
     });
   }
 
